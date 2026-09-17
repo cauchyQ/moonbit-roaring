@@ -9,10 +9,83 @@ pub struct RoaringCursor {
 }
 
 ///|
+/// A mutable staging area for bulk ingestion followed by one normalization.
+pub struct RoaringBuilder {
+  values : Array[Int]
+}
+
+///|
 /// A validated half-open interval used for batch range input and output.
 pub(all) struct IntRange {
   start : Int
   end : Int
+}
+
+///|
+/// Create an empty builder.
+pub fn RoaringBuilder::new() -> RoaringBuilder {
+  { values: [] }
+}
+
+///|
+/// Number of values staged, including duplicates that `finish` will normalize.
+pub fn RoaringBuilder::staged_len(self : RoaringBuilder) -> Int {
+  self.values.length()
+}
+
+///|
+/// Stage one non-negative value.
+pub fn RoaringBuilder::push(
+  self : RoaringBuilder,
+  value : Int,
+) -> Result[Unit, RoaringError] {
+  if value < 0 {
+    return Err(NegativeValue(value))
+  }
+  self.values.push(value)
+  Ok(())
+}
+
+///|
+/// Stage a batch atomically: invalid input appends nothing.
+pub fn RoaringBuilder::push_all(
+  self : RoaringBuilder,
+  values : Array[Int],
+) -> Result[Unit, RoaringError] {
+  for value in values {
+    if value < 0 {
+      return Err(NegativeValue(value))
+    }
+  }
+  for value in values {
+    self.values.push(value)
+  }
+  Ok(())
+}
+
+///|
+/// Stage a range subject to the normal insertion materialization limit.
+pub fn RoaringBuilder::push_range(
+  self : RoaringBuilder,
+  start : Int,
+  end : Int,
+) -> Result[Unit, RoaringError] {
+  if start < 0 || end < start {
+    return Err(InvalidRange(start, end))
+  }
+  if end - start > max_materialized_range {
+    return Err(RangeTooLarge(end - start))
+  }
+  for value in start..<end {
+    self.values.push(value)
+  }
+  Ok(())
+}
+
+///|
+/// Normalize all staged values and return an immutable bitmap.
+pub fn RoaringBuilder::finish(self : RoaringBuilder) -> RoaringBitmap {
+  from_sorted(normalize(self.values))
 }
 
 ///|

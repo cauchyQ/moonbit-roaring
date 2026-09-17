@@ -67,6 +67,16 @@ pub fn RoaringBitmap::xor(Self, Self) -> Self
 
 type RoaringBlock
 
+pub struct RoaringBuilder {
+  values : Array[Int]
+}
+pub fn RoaringBuilder::finish(Self) -> RoaringBitmap
+pub fn RoaringBuilder::new() -> Self
+pub fn RoaringBuilder::push(Self, Int) -> Result[Unit, RoaringError]
+pub fn RoaringBuilder::push_all(Self, Array[Int]) -> Result[Unit, RoaringError]
+pub fn RoaringBuilder::push_range(Self, Int, Int) -> Result[Unit, RoaringError]
+pub fn RoaringBuilder::staged_len(Self) -> Int
+
 pub struct RoaringCursor {
   bitmap : RoaringBitmap
   block_index : Int

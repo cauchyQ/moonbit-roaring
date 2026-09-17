@@ -149,6 +149,17 @@ test "batch range construction normalizes overlaps and protects total size" {
 }
 
 ///|
+test "builder stages atomically and normalizes exactly once at finish" {
+  let builder = RoaringBuilder::new()
+  assert_true(builder.push_all([7, 2, 2]) is Ok(_))
+  assert_true(builder.push_range(3, 6) is Ok(_))
+  assert_eq(builder.staged_len(), 6)
+  assert_true(builder.push_all([9, -1]) is Err(NegativeValue(-1)))
+  assert_eq(builder.staged_len(), 6)
+  assert_eq(builder.finish().to_array(), [2, 3, 4, 5, 7])
+}
+
+///|
 test "deterministic property corpus preserves set laws and codec round trips" {
   for seed in 0..<64 {
     let left_values : Array[Int] = []

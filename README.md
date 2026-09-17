@@ -47,6 +47,9 @@ moon run cmd/main
   than copying the complete bitmap at cursor creation.
 - `union_all`, `intersection_all`, and `xor_all` aggregate an array of bitmap
   operands with explicit empty-input identities, for multi-filter queries.
+- `RoaringBuilder` stages validated values, batches, and bounded inserted
+  ranges, then performs one normalization at `finish`; this is the preferred
+  ingestion path when values arrive incrementally.
 - `encode_words` and `decode_words` implement a deterministic, versioned word
   encoding: `[1, cardinality, ..strictly_ascending_values]`. The decoder
   rejects bad versions, incorrect lengths, negative values, duplicates, and
