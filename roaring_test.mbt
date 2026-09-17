@@ -65,10 +65,30 @@ test "batch range cursor and codec APIs are deterministic" {
   assert_eq(trimmed.to_array(), [2, 5, 8])
   assert_true(trimmed.count_in_range(2, 8) is Ok(2))
   let (first, cursor) = trimmed.cursor().next()
-  let (second, _) = cursor.next()
+  assert_eq(cursor.remaining(), 2)
+  let (second, cursor) = cursor.next()
+  let (third, cursor) = cursor.next()
   assert_eq(first, Some(2))
   assert_eq(second, Some(5))
+  assert_eq(third, Some(8))
+  assert_eq(cursor.remaining(), 0)
   assert_eq(decode_words(trimmed.encode_words()).unwrap().to_array(), [2, 5, 8])
+}
+
+///|
+test "bulk aggregation uses the documented empty identities" {
+  let first = RoaringBitmap::from_array([1, 2, 4, 70_000]).unwrap()
+  let second = RoaringBitmap::from_array([2, 3, 4, 80_000]).unwrap()
+  let third = RoaringBitmap::from_array([2, 4, 5]).unwrap()
+  assert_eq(union_all([first, second, third]).to_array(), [
+    1, 2, 3, 4, 5, 70_000, 80_000,
+  ])
+  assert_eq(intersection_all([first, second, third]).to_array(), [2, 4])
+  assert_eq(xor_all([first, second, third]).to_array(), [
+    1, 2, 3, 4, 5, 70_000, 80_000,
+  ])
+  assert_true(union_all([]).is_empty())
+  assert_true(intersection_all([]).is_empty())
 }
 
 ///|

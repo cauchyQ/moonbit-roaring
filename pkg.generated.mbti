@@ -4,6 +4,12 @@ package "cauchyQ/moonbit-roaring"
 // Values
 pub fn decode_words(Array[Int]) -> Result[RoaringBitmap, CodecError]
 
+pub fn intersection_all(Array[RoaringBitmap]) -> RoaringBitmap
+
+pub fn union_all(Array[RoaringBitmap]) -> RoaringBitmap
+
+pub fn xor_all(Array[RoaringBitmap]) -> RoaringBitmap
+
 // Errors
 
 // Types and methods
@@ -62,10 +68,14 @@ pub fn RoaringBitmap::xor(Self, Self) -> Self
 type RoaringBlock
 
 pub struct RoaringCursor {
-  values : Array[Int]
-  index : Int
+  bitmap : RoaringBitmap
+  block_index : Int
+  lows : Array[Int]
+  low_index : Int
+  yielded : Int
 }
 pub fn RoaringCursor::next(Self) -> (Int?, Self)
+pub fn RoaringCursor::remaining(Self) -> Int
 
 pub(all) enum RoaringError {
   NegativeValue(Int)

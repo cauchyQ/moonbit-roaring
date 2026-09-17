@@ -42,7 +42,10 @@ moon run cmd/main
   cover; it explicitly rejects the unrepresentable half-open endpoint after
   the maximum `Int`.
 - `cursor().next()` traverses values in ascending order without exposing the
-  internal container representation.
+  internal container representation, loading one container at a time rather
+  than copying the complete bitmap at cursor creation.
+- `union_all`, `intersection_all`, and `xor_all` aggregate an array of bitmap
+  operands with explicit empty-input identities, for multi-filter queries.
 - `encode_words` and `decode_words` implement a deterministic, versioned word
   encoding: `[1, cardinality, ..strictly_ascending_values]`. The decoder
   rejects bad versions, incorrect lengths, negative values, duplicates, and

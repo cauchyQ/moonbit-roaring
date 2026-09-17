@@ -1,8 +1,11 @@
 ///|
 /// Cursor for ascending traversal without exposing container internals.
 pub struct RoaringCursor {
-  values : Array[Int]
-  index : Int
+  bitmap : RoaringBitmap
+  block_index : Int
+  lows : Array[Int]
+  low_index : Int
+  yielded : Int
 }
 
 ///|
@@ -153,20 +156,84 @@ pub fn RoaringBitmap::to_ranges(
 ///|
 /// Start a stable ascending cursor.
 pub fn RoaringBitmap::cursor(self : RoaringBitmap) -> RoaringCursor {
-  { values: self.to_array(), index: 0 }
+  { bitmap: self, block_index: 0, lows: [], low_index: 0, yielded: 0 }
 }
 
 ///|
 /// Return the next value and a successor cursor. The original cursor is unchanged.
 pub fn RoaringCursor::next(self : RoaringCursor) -> (Int?, RoaringCursor) {
-  if self.index >= self.values.length() {
-    (None, self)
-  } else {
-    (
-      Some(self.values[self.index]),
-      { values: self.values, index: self.index + 1 },
-    )
+  let mut block_index = self.block_index
+  let mut lows = self.lows
+  let mut low_index = self.low_index
+  while block_index < self.bitmap.blocks.length() && low_index >= lows.length() {
+    lows = self.bitmap.blocks[block_index].container.values()
+    low_index = 0
+    if lows.length() == 0 {
+      block_index += 1
+    }
   }
+  if block_index >= self.bitmap.blocks.length() {
+    return (None, self)
+  }
+  let value = self.bitmap.blocks[block_index].key * block_size + lows[low_index]
+  let next_low_index = low_index + 1
+  let next_block_index = if next_low_index == lows.length() {
+    block_index + 1
+  } else {
+    block_index
+  }
+  (
+    Some(value),
+    {
+      bitmap: self.bitmap,
+      block_index: next_block_index,
+      lows,
+      low_index: next_low_index,
+      yielded: self.yielded + 1,
+    },
+  )
+}
+
+///|
+/// Number of values not yet returned by this cursor.
+pub fn RoaringCursor::remaining(self : RoaringCursor) -> Int {
+  self.bitmap.cardinality() - self.yielded
+}
+
+///|
+/// Union every bitmap in `bitmaps`. The identity for an empty input is empty.
+pub fn union_all(bitmaps : Array[RoaringBitmap]) -> RoaringBitmap {
+  let mut result = RoaringBitmap::new()
+  for bitmap in bitmaps {
+    result = result.union(bitmap)
+  }
+  result
+}
+
+///|
+/// Intersect every bitmap in `bitmaps`. The identity for an empty input is empty.
+pub fn intersection_all(bitmaps : Array[RoaringBitmap]) -> RoaringBitmap {
+  if bitmaps.length() == 0 {
+    return RoaringBitmap::new()
+  }
+  let mut result = bitmaps[0]
+  for index in 1..<bitmaps.length() {
+    result = result.intersection(bitmaps[index])
+    if result.is_empty() {
+      return result
+    }
+  }
+  result
+}
+
+///|
+/// Symmetric-difference every bitmap in `bitmaps`. The empty identity is empty.
+pub fn xor_all(bitmaps : Array[RoaringBitmap]) -> RoaringBitmap {
+  let mut result = RoaringBitmap::new()
+  for bitmap in bitmaps {
+    result = result.xor(bitmap)
+  }
+  result
 }
 
 ///|
