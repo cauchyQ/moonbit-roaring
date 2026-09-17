@@ -31,3 +31,14 @@ test "non-negative boundary and removal are checked" {
   assert_eq(bitmap.remove(2_147_483_647).cardinality(), 0)
   assert_true(RoaringBitmap::new().add(-1) is Err(NegativeValue(-1)))
 }
+
+///|
+test "metadata and relational queries preserve set semantics" {
+  let sparse = RoaringBitmap::from_array([4, 7, 9]).unwrap()
+  let dense = RoaringBitmap::new().add_range(0, 5_000).unwrap()
+  assert_eq(sparse.minimum(), Some(4))
+  assert_eq(sparse.maximum(), Some(9))
+  assert_true(sparse.intersects(dense))
+  assert_true(sparse.difference(dense).is_subset_of(sparse))
+  assert_eq(dense.stats().bitmap_blocks, 1)
+}

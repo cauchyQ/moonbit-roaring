@@ -36,6 +36,15 @@ pub(all) enum RoaringError {
 }
 
 ///|
+pub(all) struct RoaringStats {
+  block_count : Int
+  array_blocks : Int
+  bitmap_blocks : Int
+  run_blocks : Int
+  cardinality : Int
+}
+
+///|
 let block_size = 65_536
 
 ///|
@@ -86,6 +95,51 @@ pub fn RoaringBitmap::cardinality(self : RoaringBitmap) -> Int {
     total += block.container.cardinality()
   }
   total
+}
+
+///|
+pub fn RoaringBitmap::is_empty(self : RoaringBitmap) -> Bool {
+  self.blocks.length() == 0
+}
+
+///|
+pub fn RoaringBitmap::minimum(self : RoaringBitmap) -> Int? {
+  if self.is_empty() {
+    None
+  } else {
+    Some(self.to_array()[0])
+  }
+}
+
+///|
+pub fn RoaringBitmap::maximum(self : RoaringBitmap) -> Int? {
+  let values = self.to_array()
+  if values.length() == 0 {
+    None
+  } else {
+    Some(values[values.length() - 1])
+  }
+}
+
+///|
+pub fn RoaringBitmap::stats(self : RoaringBitmap) -> RoaringStats {
+  let mut arrays = 0
+  let mut bitmaps = 0
+  let mut runs = 0
+  for block in self.blocks {
+    match block.container {
+      ArrayContainer(_) => arrays += 1
+      BitmapContainer(_, _) => bitmaps += 1
+      RunContainer(_, _) => runs += 1
+    }
+  }
+  {
+    block_count: self.blocks.length(),
+    array_blocks: arrays,
+    bitmap_blocks: bitmaps,
+    run_blocks: runs,
+    cardinality: self.cardinality(),
+  }
 }
 
 ///|
@@ -143,9 +197,7 @@ pub fn RoaringBitmap::union(
   self : RoaringBitmap,
   other : RoaringBitmap,
 ) -> RoaringBitmap {
-  let values = self.to_array()
-  values.append(other.to_array())
-  from_sorted(normalize(values))
+  from_sorted(union_sorted(self.to_array(), other.to_array()))
 }
 
 ///|
@@ -154,8 +206,7 @@ pub fn RoaringBitmap::intersection(
   self : RoaringBitmap,
   other : RoaringBitmap,
 ) -> RoaringBitmap {
-  let right = other.to_array()
-  from_sorted(self.to_array().filter(value => right.contains(value)))
+  from_sorted(intersection_sorted(self.to_array(), other.to_array()))
 }
 
 ///|
@@ -164,8 +215,7 @@ pub fn RoaringBitmap::difference(
   self : RoaringBitmap,
   other : RoaringBitmap,
 ) -> RoaringBitmap {
-  let right = other.to_array()
-  from_sorted(self.to_array().filter(value => !right.contains(value)))
+  from_sorted(difference_sorted(self.to_array(), other.to_array()))
 }
 
 ///|
@@ -174,7 +224,25 @@ pub fn RoaringBitmap::xor(
   self : RoaringBitmap,
   other : RoaringBitmap,
 ) -> RoaringBitmap {
-  self.difference(other).union(other.difference(self))
+  let left_only = difference_sorted(self.to_array(), other.to_array())
+  let right_only = difference_sorted(other.to_array(), self.to_array())
+  from_sorted(union_sorted(left_only, right_only))
+}
+
+///|
+pub fn RoaringBitmap::intersects(
+  self : RoaringBitmap,
+  other : RoaringBitmap,
+) -> Bool {
+  !self.intersection(other).is_empty()
+}
+
+///|
+pub fn RoaringBitmap::is_subset_of(
+  self : RoaringBitmap,
+  other : RoaringBitmap,
+) -> Bool {
+  self.difference(other).is_empty()
 }
 
 ///|
@@ -207,6 +275,63 @@ fn normalize(values : Array[Int]) -> Array[Int] {
     if output.length() == 0 || output[output.length() - 1] != value {
       output.push(value)
     }
+  }
+  output
+}
+
+///|
+fn union_sorted(left : Array[Int], right : Array[Int]) -> Array[Int] {
+  let output : Array[Int] = []
+  let mut a = 0
+  let mut b = 0
+  while a < left.length() || b < right.length() {
+    if b == right.length() || (a < left.length() && left[a] < right[b]) {
+      output.push(left[a])
+      a += 1
+    } else if a == left.length() || right[b] < left[a] {
+      output.push(right[b])
+      b += 1
+    } else {
+      output.push(left[a])
+      a += 1
+      b += 1
+    }
+  }
+  output
+}
+
+///|
+fn intersection_sorted(left : Array[Int], right : Array[Int]) -> Array[Int] {
+  let output : Array[Int] = []
+  let mut a = 0
+  let mut b = 0
+  while a < left.length() && b < right.length() {
+    if left[a] < right[b] {
+      a += 1
+    } else if right[b] < left[a] {
+      b += 1
+    } else {
+      output.push(left[a])
+      a += 1
+      b += 1
+    }
+  }
+  output
+}
+
+///|
+fn difference_sorted(left : Array[Int], right : Array[Int]) -> Array[Int] {
+  let output : Array[Int] = []
+  let mut a = 0
+  let mut b = 0
+  while a < left.length() {
+    while b < right.length() && right[b] < left[a] {
+      b += 1
+    }
+    if b == right.length() || left[a] < right[b] {
+      output.push(left[a])
+    }
+    a += 1
   }
   output
 }
