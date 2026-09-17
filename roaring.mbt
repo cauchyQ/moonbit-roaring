@@ -116,17 +116,23 @@ pub fn RoaringBitmap::minimum(self : RoaringBitmap) -> Int? {
   if self.is_empty() {
     None
   } else {
-    Some(self.to_array()[0])
+    match self.blocks[0].container.minimum() {
+      Some(low) => Some(self.blocks[0].key * block_size + low)
+      None => None
+    }
   }
 }
 
 ///|
 pub fn RoaringBitmap::maximum(self : RoaringBitmap) -> Int? {
-  let values = self.to_array()
-  if values.length() == 0 {
+  if self.is_empty() {
     None
   } else {
-    Some(values[values.length() - 1])
+    let last = self.blocks[self.blocks.length() - 1]
+    match last.container.maximum() {
+      Some(low) => Some(last.key * block_size + low)
+      None => None
+    }
   }
 }
 
@@ -157,7 +163,17 @@ pub fn RoaringBitmap::contains(self : RoaringBitmap, value : Int) -> Bool {
   if !valid_value(value) {
     return false
   }
-  self.to_array().contains(value)
+  let key = value / block_size
+  let low = value % block_size
+  for block in self.blocks {
+    if block.key == key {
+      return block.container.contains(low)
+    }
+    if block.key > key {
+      return false
+    }
+  }
+  false
 }
 
 ///|
@@ -258,17 +274,42 @@ pub fn RoaringBitmap::is_subset_of(
 ///|
 /// Number of values less than or equal to `value`.
 pub fn RoaringBitmap::rank(self : RoaringBitmap, value : Int) -> Int {
-  self.to_array().filter(item => item <= value).length()
+  if value < 0 {
+    return 0
+  }
+  let key = value / block_size
+  let low = value % block_size
+  let mut total = 0
+  for block in self.blocks {
+    if block.key < key {
+      total += block.container.cardinality()
+    } else if block.key == key {
+      return total + block.container.rank(low)
+    } else {
+      return total
+    }
+  }
+  total
 }
 
 ///|
 /// The zero-based `index`th value, if present.
 pub fn RoaringBitmap::select(self : RoaringBitmap, index : Int) -> Int? {
   if index < 0 || index >= self.cardinality() {
-    None
-  } else {
-    Some(self.to_array()[index])
+    return None
   }
+  let mut remaining = index
+  for block in self.blocks {
+    let count = block.container.cardinality()
+    if remaining < count {
+      match block.container.select(remaining) {
+        Some(low) => return Some(block.key * block_size + low)
+        None => return None
+      }
+    }
+    remaining -= count
+  }
+  None
 }
 
 ///|
@@ -514,6 +555,94 @@ fn Container::cardinality(self : Container) -> Int {
     ArrayContainer(values) => values.length()
     BitmapContainer(_, count) => count
     RunContainer(_, count) => count
+  }
+}
+
+///|
+/// Membership in one low-16-bit container.
+fn Container::contains(self : Container, low : Int) -> Bool {
+  match self {
+    ArrayContainer(values) => values.contains(low)
+    BitmapContainer(words, _) =>
+      (words[low / word_bits] & (1 << (low % word_bits))) != 0
+    RunContainer(runs, _) => {
+      for run in runs {
+        if run.start <= low && low <= run.end {
+          return true
+        }
+        if run.start > low {
+          return false
+        }
+      }
+      false
+    }
+  }
+}
+
+///|
+/// Number of container values less than or equal to `low`.
+fn Container::rank(self : Container, low : Int) -> Int {
+  match self {
+    ArrayContainer(values) => values.filter(value => value <= low).length()
+    BitmapContainer(_, _) =>
+      self.values().filter(value => value <= low).length()
+    RunContainer(runs, _) => {
+      let mut total = 0
+      for run in runs {
+        if low < run.start {
+          return total
+        }
+        total += if low < run.end {
+          low - run.start + 1
+        } else {
+          run.end - run.start + 1
+        }
+        if low <= run.end {
+          return total
+        }
+      }
+      total
+    }
+  }
+}
+
+///|
+/// Select a low value by zero-based index.
+fn Container::select(self : Container, index : Int) -> Int? {
+  match self {
+    ArrayContainer(values) => Some(values[index])
+    BitmapContainer(_, _) => Some(self.values()[index])
+    RunContainer(runs, _) => {
+      let mut remaining = index
+      for run in runs {
+        let length = run.end - run.start + 1
+        if remaining < length {
+          return Some(run.start + remaining)
+        }
+        remaining -= length
+      }
+      None
+    }
+  }
+}
+
+///|
+/// First low value, if any.
+fn Container::minimum(self : Container) -> Int? {
+  match self {
+    ArrayContainer(values) => Some(values[0])
+    BitmapContainer(_, _) => self.select(0)
+    RunContainer(runs, _) => Some(runs[0].start)
+  }
+}
+
+///|
+/// Last low value, if any.
+fn Container::maximum(self : Container) -> Int? {
+  match self {
+    ArrayContainer(values) => Some(values[values.length() - 1])
+    BitmapContainer(_, count) => self.select(count - 1)
+    RunContainer(runs, _) => Some(runs[runs.length() - 1].end)
   }
 }
 

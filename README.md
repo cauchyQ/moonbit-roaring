@@ -45,6 +45,10 @@ moon run cmd/main
   non-canonical order. This is deliberately *not* CRoaring binary format.
 - Union, intersection, difference, and xor merge high-16-bit blocks first and
   dispatch matching keys to container-local operations.
+- Point membership, extrema, `rank`, and `select` stay at block/container
+  level. `contains_range`, `next_at_or_after`, and `previous_at_or_before`
+  build range and navigation queries from those primitives without allocating
+  a temporary range bitmap.
 
 The test suite includes fixed boundary tests plus a deterministic 64-case
 property corpus covering commutativity, idempotence, cancellation, and

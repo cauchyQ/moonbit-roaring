@@ -24,6 +24,7 @@ pub fn RoaringBitmap::add_all(Self, Array[Int]) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::add_range(Self, Int, Int) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::cardinality(Self) -> Int
 pub fn RoaringBitmap::contains(Self, Int) -> Bool
+pub fn RoaringBitmap::contains_range(Self, Int, Int) -> Result[Bool, RoaringError]
 pub fn RoaringBitmap::count_in_range(Self, Int, Int) -> Result[Int, RoaringError]
 pub fn RoaringBitmap::cursor(Self) -> RoaringCursor
 pub fn RoaringBitmap::difference(Self, Self) -> Self
@@ -37,6 +38,8 @@ pub fn RoaringBitmap::is_subset_of(Self, Self) -> Bool
 pub fn RoaringBitmap::maximum(Self) -> Int?
 pub fn RoaringBitmap::minimum(Self) -> Int?
 pub fn RoaringBitmap::new() -> Self
+pub fn RoaringBitmap::next_at_or_after(Self, Int) -> Int?
+pub fn RoaringBitmap::previous_at_or_before(Self, Int) -> Int?
 pub fn RoaringBitmap::rank(Self, Int) -> Int
 pub fn RoaringBitmap::remove(Self, Int) -> Self
 pub fn RoaringBitmap::remove_all(Self, Array[Int]) -> Result[Self, RoaringError]

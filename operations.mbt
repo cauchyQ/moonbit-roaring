@@ -88,7 +88,55 @@ pub fn RoaringBitmap::count_in_range(
   if start < 0 || end < start {
     return Err(InvalidRange(start, end))
   }
-  Ok(self.to_array().filter(value => start <= value && value < end).length())
+  if start == end {
+    return Ok(0)
+  }
+  Ok(self.rank(end - 1) - self.rank(start - 1))
+}
+
+///|
+/// True only when every value in the half-open range belongs to this bitmap.
+/// Unlike construction, this query never materializes the range.
+pub fn RoaringBitmap::contains_range(
+  self : RoaringBitmap,
+  start : Int,
+  end : Int,
+) -> Result[Bool, RoaringError] {
+  if start < 0 || end < start {
+    return Err(InvalidRange(start, end))
+  }
+  match self.count_in_range(start, end) {
+    Ok(count) => Ok(count == end - start)
+    Err(error) => Err(error)
+  }
+}
+
+///|
+/// Return the first member greater than or equal to `value`.
+pub fn RoaringBitmap::next_at_or_after(
+  self : RoaringBitmap,
+  value : Int,
+) -> Int? {
+  if self.is_empty() {
+    return None
+  }
+  if value <= 0 {
+    return self.minimum()
+  }
+  self.select(self.rank(value - 1))
+}
+
+///|
+/// Return the last member less than or equal to `value`.
+pub fn RoaringBitmap::previous_at_or_before(
+  self : RoaringBitmap,
+  value : Int,
+) -> Int? {
+  if value < 0 {
+    None
+  } else {
+    self.select(self.rank(value) - 1)
+  }
 }
 
 ///| A deterministic, versioned word encoding: `[version, cardinality, values…]`.

@@ -44,6 +44,21 @@ test "metadata and relational queries preserve set semantics" {
 }
 
 ///|
+test "container-aware point and range queries cross block boundaries" {
+  let bitmap = RoaringBitmap::from_array([1, 2, 3, 65_535, 65_536, 65_538]).unwrap()
+  assert_true(bitmap.contains(65_536))
+  assert_true(!bitmap.contains(65_537))
+  assert_eq(bitmap.rank(65_535), 4)
+  assert_eq(bitmap.rank(65_536), 5)
+  assert_eq(bitmap.select(4), Some(65_536))
+  assert_true(bitmap.contains_range(1, 4) is Ok(true))
+  assert_true(bitmap.contains_range(65_535, 65_538) is Ok(false))
+  assert_eq(bitmap.count_in_range(65_535, 65_538).unwrap(), 2)
+  assert_eq(bitmap.next_at_or_after(4), Some(65_535))
+  assert_eq(bitmap.previous_at_or_before(65_537), Some(65_536))
+}
+
+///|
 test "batch range cursor and codec APIs are deterministic" {
   let bitmap = RoaringBitmap::from_range(2, 6).unwrap().add_all([8, 9]).unwrap()
   let trimmed = bitmap.remove_range(3, 5).unwrap().remove_all([9]).unwrap()
