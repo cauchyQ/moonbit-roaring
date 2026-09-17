@@ -1,0 +1,37 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "cauchyQ/moonbit-roaring"
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct RoaringBitmap {
+  blocks : Array[RoaringBlock]
+}
+pub fn RoaringBitmap::add(Self, Int) -> Result[Self, RoaringError]
+pub fn RoaringBitmap::add_range(Self, Int, Int) -> Result[Self, RoaringError]
+pub fn RoaringBitmap::cardinality(Self) -> Int
+pub fn RoaringBitmap::contains(Self, Int) -> Bool
+pub fn RoaringBitmap::difference(Self, Self) -> Self
+pub fn RoaringBitmap::from_array(Array[Int]) -> Result[Self, RoaringError]
+pub fn RoaringBitmap::intersection(Self, Self) -> Self
+pub fn RoaringBitmap::new() -> Self
+pub fn RoaringBitmap::rank(Self, Int) -> Int
+pub fn RoaringBitmap::remove(Self, Int) -> Self
+pub fn RoaringBitmap::select(Self, Int) -> Int?
+pub fn RoaringBitmap::to_array(Self) -> Array[Int]
+pub fn RoaringBitmap::union(Self, Self) -> Self
+pub fn RoaringBitmap::xor(Self, Self) -> Self
+
+type RoaringBlock
+
+pub(all) enum RoaringError {
+  NegativeValue(Int)
+  InvalidRange(Int, Int)
+}
+
+// Type aliases
+
+// Traits
+
