@@ -89,10 +89,12 @@ pub fn RoaringBitmap::remove_range(
   start : Int,
   end : Int,
 ) -> Result[RoaringBitmap, RoaringError] {
-  match RoaringBitmap::from_range(start, end) {
-    Ok(range) => Ok(self.difference(range))
-    Err(error) => Err(error)
+  if start < 0 || end < start {
+    return Err(InvalidRange(start, end))
   }
+  Ok(
+    from_sorted(self.to_array().filter(value => value < start || value >= end)),
+  )
 }
 
 ///|
@@ -113,10 +115,37 @@ pub fn RoaringBitmap::remove_ranges(
   self : RoaringBitmap,
   ranges : Array[IntRange],
 ) -> Result[RoaringBitmap, RoaringError] {
-  match RoaringBitmap::from_ranges(ranges) {
-    Ok(other) => Ok(self.difference(other))
+  match validate_ranges(ranges) {
     Err(error) => Err(error)
+    Ok(_) =>
+      Ok(
+        from_sorted(
+          self.to_array().filter(value => !in_any_range(value, ranges)),
+        ),
+      )
   }
+}
+
+///|
+/// Validate interval boundaries without imposing the insertion materialization cap.
+fn validate_ranges(ranges : Array[IntRange]) -> Result[Unit, RoaringError] {
+  for range in ranges {
+    if range.start < 0 || range.end < range.start {
+      return Err(InvalidRange(range.start, range.end))
+    }
+  }
+  Ok(())
+}
+
+///|
+/// Test whether a stored value belongs to any half-open input interval.
+fn in_any_range(value : Int, ranges : Array[IntRange]) -> Bool {
+  for range in ranges {
+    if range.start <= value && value < range.end {
+      return true
+    }
+  }
+  false
 }
 
 ///|

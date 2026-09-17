@@ -32,8 +32,9 @@ moon run cmd/main
 ## Implemented API boundaries
 
 - `from_range`, `add_range`, and `remove_range` use half-open ranges and reject
-  negative, inverted, and ranges longer than 1,000,000 values. The limit is a
-  deliberate safety boundary while ranges are materialized.
+  negative and inverted endpoints. Constructing or adding a range longer than
+  1,000,000 values is rejected because it materializes new members; removing a
+  range has no such cap because it only scans members already stored.
 - `add_all` and `remove_all` validate a whole batch before returning a new,
   immutable bitmap; invalid input returns an error rather than silently
   changing the batch.

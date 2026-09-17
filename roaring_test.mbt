@@ -107,6 +107,11 @@ test "range and batch APIs reject unsafe or invalid input" {
   )
   let bitmap = RoaringBitmap::from_array([2, 4]).unwrap()
   assert_true(bitmap.remove_all([4, -1]) is Err(NegativeValue(-1)))
+  let cleared = RoaringBitmap::from_array([2, 700_000])
+    .unwrap()
+    .remove_range(0, 1_500_000)
+    .unwrap()
+  assert_true(cleared.is_empty())
 }
 
 ///|
