@@ -16,12 +16,18 @@ pub(all) enum CodecError {
   NonCanonicalPayload
 }
 
+pub(all) struct IntRange {
+  start : Int
+  end : Int
+}
+
 pub struct RoaringBitmap {
   blocks : Array[RoaringBlock]
 }
 pub fn RoaringBitmap::add(Self, Int) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::add_all(Self, Array[Int]) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::add_range(Self, Int, Int) -> Result[Self, RoaringError]
+pub fn RoaringBitmap::add_ranges(Self, Array[IntRange]) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::cardinality(Self) -> Int
 pub fn RoaringBitmap::contains(Self, Int) -> Bool
 pub fn RoaringBitmap::contains_range(Self, Int, Int) -> Result[Bool, RoaringError]
@@ -31,6 +37,7 @@ pub fn RoaringBitmap::difference(Self, Self) -> Self
 pub fn RoaringBitmap::encode_words(Self) -> Array[Int]
 pub fn RoaringBitmap::from_array(Array[Int]) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::from_range(Int, Int) -> Result[Self, RoaringError]
+pub fn RoaringBitmap::from_ranges(Array[IntRange]) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::intersection(Self, Self) -> Self
 pub fn RoaringBitmap::intersects(Self, Self) -> Bool
 pub fn RoaringBitmap::is_empty(Self) -> Bool
@@ -44,9 +51,11 @@ pub fn RoaringBitmap::rank(Self, Int) -> Int
 pub fn RoaringBitmap::remove(Self, Int) -> Self
 pub fn RoaringBitmap::remove_all(Self, Array[Int]) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::remove_range(Self, Int, Int) -> Result[Self, RoaringError]
+pub fn RoaringBitmap::remove_ranges(Self, Array[IntRange]) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::select(Self, Int) -> Int?
 pub fn RoaringBitmap::stats(Self) -> RoaringStats
 pub fn RoaringBitmap::to_array(Self) -> Array[Int]
+pub fn RoaringBitmap::to_ranges(Self) -> Result[Array[IntRange], RoaringError]
 pub fn RoaringBitmap::union(Self, Self) -> Self
 pub fn RoaringBitmap::xor(Self, Self) -> Self
 
@@ -62,6 +71,7 @@ pub(all) enum RoaringError {
   NegativeValue(Int)
   InvalidRange(Int, Int)
   RangeTooLarge(Int)
+  RangeEndpointOverflow(Int)
 }
 
 pub(all) struct RoaringStats {

@@ -34,6 +34,7 @@ pub(all) enum RoaringError {
   NegativeValue(Int)
   InvalidRange(Int, Int)
   RangeTooLarge(Int)
+  RangeEndpointOverflow(Int)
 }
 
 ///|

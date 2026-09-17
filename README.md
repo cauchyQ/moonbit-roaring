@@ -37,6 +37,10 @@ moon run cmd/main
 - `add_all` and `remove_all` validate a whole batch before returning a new,
   immutable bitmap; invalid input returns an error rather than silently
   changing the batch.
+- `from_ranges`, `add_ranges`, and `remove_ranges` accept batches of half-open
+  intervals and normalize overlap. `to_ranges` returns a canonical interval
+  cover; it explicitly rejects the unrepresentable half-open endpoint after
+  the maximum `Int`.
 - `cursor().next()` traverses values in ascending order without exposing the
   internal container representation.
 - `encode_words` and `decode_words` implement a deterministic, versioned word

@@ -90,6 +90,40 @@ test "range and batch APIs reject unsafe or invalid input" {
 }
 
 ///|
+test "batch range construction normalizes overlaps and protects total size" {
+  let bitmap = RoaringBitmap::from_ranges([
+    { start: 2, end: 5 },
+    { start: 4, end: 8 },
+    { start: 10, end: 12 },
+  ]).unwrap()
+  assert_eq(bitmap.to_array(), [2, 3, 4, 5, 6, 7, 10, 11])
+  let ranges = bitmap.to_ranges().unwrap()
+  assert_eq(ranges.length(), 2)
+  assert_eq(ranges[0].start, 2)
+  assert_eq(ranges[0].end, 8)
+  assert_eq(ranges[1].start, 10)
+  assert_eq(ranges[1].end, 12)
+  assert_eq(bitmap.remove_ranges([{ start: 3, end: 11 }]).unwrap().to_array(), [
+    2, 11,
+  ])
+  assert_true(
+    RoaringBitmap::from_ranges([{ start: -1, end: 2 }])
+    is Err(InvalidRange(-1, 2)),
+  )
+  assert_true(
+    RoaringBitmap::from_ranges([
+      { start: 0, end: 600_000 },
+      { start: 700_000, end: 1_300_001 },
+    ])
+    is Err(RangeTooLarge(1_200_001)),
+  )
+  assert_true(
+    RoaringBitmap::from_array([2_147_483_647]).unwrap().to_ranges()
+    is Err(RangeEndpointOverflow(2_147_483_647)),
+  )
+}
+
+///|
 test "deterministic property corpus preserves set laws and codec round trips" {
   for seed in 0..<64 {
     let left_values : Array[Int] = []
