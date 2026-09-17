@@ -33,6 +33,7 @@ priv enum Container {
 pub(all) enum RoaringError {
   NegativeValue(Int)
   InvalidRange(Int, Int)
+  RangeTooLarge(Int)
 }
 
 ///|
@@ -55,6 +56,14 @@ let word_bits = 32
 
 ///|
 let word_count = 2_048
+
+///| The maximum number of individual values accepted by range constructors.
+
+///|
+/// Range operations currently materialize their members before choosing a
+/// container. Keeping this ceiling explicit prevents an accidental request for
+/// a near-whole-domain range from exhausting memory.
+let max_materialized_range = 1_000_000
 
 ///|
 /// Create an empty bitmap.
@@ -184,6 +193,9 @@ pub fn RoaringBitmap::add_range(
   if start < 0 || end < start {
     return Err(InvalidRange(start, end))
   }
+  if end - start > max_materialized_range {
+    return Err(RangeTooLarge(end - start))
+  }
   let values = self.to_array()
   for value in start..<end {
     values.push(value)
@@ -197,7 +209,7 @@ pub fn RoaringBitmap::union(
   self : RoaringBitmap,
   other : RoaringBitmap,
 ) -> RoaringBitmap {
-  from_sorted(union_sorted(self.to_array(), other.to_array()))
+  union_blocks(self.blocks, other.blocks)
 }
 
 ///|
@@ -206,7 +218,7 @@ pub fn RoaringBitmap::intersection(
   self : RoaringBitmap,
   other : RoaringBitmap,
 ) -> RoaringBitmap {
-  from_sorted(intersection_sorted(self.to_array(), other.to_array()))
+  intersection_blocks(self.blocks, other.blocks)
 }
 
 ///|
@@ -215,7 +227,7 @@ pub fn RoaringBitmap::difference(
   self : RoaringBitmap,
   other : RoaringBitmap,
 ) -> RoaringBitmap {
-  from_sorted(difference_sorted(self.to_array(), other.to_array()))
+  difference_blocks(self.blocks, other.blocks)
 }
 
 ///|
@@ -224,9 +236,7 @@ pub fn RoaringBitmap::xor(
   self : RoaringBitmap,
   other : RoaringBitmap,
 ) -> RoaringBitmap {
-  let left_only = difference_sorted(self.to_array(), other.to_array())
-  let right_only = difference_sorted(other.to_array(), self.to_array())
-  from_sorted(union_sorted(left_only, right_only))
+  xor_blocks(self.blocks, other.blocks)
 }
 
 ///|
@@ -337,6 +347,114 @@ fn difference_sorted(left : Array[Int], right : Array[Int]) -> Array[Int] {
 }
 
 ///|
+/// Merge blocks for union, dispatching work only when high-16-bit keys match.
+fn union_blocks(
+  left : Array[RoaringBlock],
+  right : Array[RoaringBlock],
+) -> RoaringBitmap {
+  let output : Array[RoaringBlock] = []
+  let mut a = 0
+  let mut b = 0
+  while a < left.length() || b < right.length() {
+    if b == right.length() || (a < left.length() && left[a].key < right[b].key) {
+      output.push(left[a])
+      a += 1
+    } else if a == left.length() || right[b].key < left[a].key {
+      output.push(right[b])
+      b += 1
+    } else {
+      output.push({
+        key: left[a].key,
+        container: left[a].container.union(right[b].container),
+      })
+      a += 1
+      b += 1
+    }
+  }
+  { blocks: output }
+}
+
+///|
+/// Merge blocks for intersection.
+fn intersection_blocks(
+  left : Array[RoaringBlock],
+  right : Array[RoaringBlock],
+) -> RoaringBitmap {
+  let output : Array[RoaringBlock] = []
+  let mut a = 0
+  let mut b = 0
+  while a < left.length() && b < right.length() {
+    if left[a].key < right[b].key {
+      a += 1
+    } else if right[b].key < left[a].key {
+      b += 1
+    } else {
+      let container = left[a].container.intersection(right[b].container)
+      if container.cardinality() > 0 {
+        output.push({ key: left[a].key, container })
+      }
+      a += 1
+      b += 1
+    }
+  }
+  { blocks: output }
+}
+
+///|
+/// Merge blocks for left difference.
+fn difference_blocks(
+  left : Array[RoaringBlock],
+  right : Array[RoaringBlock],
+) -> RoaringBitmap {
+  let output : Array[RoaringBlock] = []
+  let mut a = 0
+  let mut b = 0
+  while a < left.length() {
+    while b < right.length() && right[b].key < left[a].key {
+      b += 1
+    }
+    if b == right.length() || left[a].key < right[b].key {
+      output.push(left[a])
+    } else {
+      let container = left[a].container.difference(right[b].container)
+      if container.cardinality() > 0 {
+        output.push({ key: left[a].key, container })
+      }
+    }
+    a += 1
+  }
+  { blocks: output }
+}
+
+///|
+/// Merge blocks for symmetric difference.
+fn xor_blocks(
+  left : Array[RoaringBlock],
+  right : Array[RoaringBlock],
+) -> RoaringBitmap {
+  let output : Array[RoaringBlock] = []
+  let mut a = 0
+  let mut b = 0
+  while a < left.length() || b < right.length() {
+    if b == right.length() || (a < left.length() && left[a].key < right[b].key) {
+      output.push(left[a])
+      a += 1
+    } else if a == left.length() || right[b].key < left[a].key {
+      output.push(right[b])
+      b += 1
+    } else {
+      let container = left[a].container.xor(right[b].container)
+      if container.cardinality() > 0 {
+        output.push({ key: left[a].key, container })
+      }
+      a += 1
+      b += 1
+    }
+  }
+  { blocks: output }
+}
+
+///|
 fn from_sorted(values : Array[Int]) -> RoaringBitmap {
   let blocks : Array[RoaringBlock] = []
   let mut index = 0
@@ -362,6 +480,32 @@ fn Container::from_lows(lows : Array[Int]) -> Container {
   } else {
     ArrayContainer(lows)
   }
+}
+
+///|
+/// Container-local union. This avoids flattening unrelated high-16-bit blocks.
+fn Container::union(self : Container, other : Container) -> Container {
+  Container::from_lows(union_sorted(self.values(), other.values()))
+}
+
+///|
+/// Container-local intersection.
+fn Container::intersection(self : Container, other : Container) -> Container {
+  Container::from_lows(intersection_sorted(self.values(), other.values()))
+}
+
+///|
+/// Container-local difference.
+fn Container::difference(self : Container, other : Container) -> Container {
+  Container::from_lows(difference_sorted(self.values(), other.values()))
+}
+
+///|
+/// Container-local symmetric difference.
+fn Container::xor(self : Container, other : Container) -> Container {
+  let left_only = difference_sorted(self.values(), other.values())
+  let right_only = difference_sorted(other.values(), self.values())
+  Container::from_lows(union_sorted(left_only, right_only))
 }
 
 ///|

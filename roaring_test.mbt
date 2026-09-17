@@ -42,3 +42,63 @@ test "metadata and relational queries preserve set semantics" {
   assert_true(sparse.difference(dense).is_subset_of(sparse))
   assert_eq(dense.stats().bitmap_blocks, 1)
 }
+
+///|
+test "batch range cursor and codec APIs are deterministic" {
+  let bitmap = RoaringBitmap::from_range(2, 6).unwrap().add_all([8, 9]).unwrap()
+  let trimmed = bitmap.remove_range(3, 5).unwrap().remove_all([9]).unwrap()
+  assert_eq(trimmed.to_array(), [2, 5, 8])
+  assert_true(trimmed.count_in_range(2, 8) is Ok(2))
+  let (first, cursor) = trimmed.cursor().next()
+  let (second, _) = cursor.next()
+  assert_eq(first, Some(2))
+  assert_eq(second, Some(5))
+  assert_eq(decode_words(trimmed.encode_words()).unwrap().to_array(), [2, 5, 8])
+}
+
+///|
+test "codec rejects invalid version count and noncanonical input" {
+  assert_true(decode_words([]) is Err(MissingHeader))
+  assert_true(decode_words([2, 0]) is Err(UnsupportedVersion(2)))
+  assert_true(decode_words([1, 2, 7]) is Err(InvalidPayloadLength(2, 1)))
+  assert_true(decode_words([1, 2, 7, 7]) is Err(NonCanonicalPayload))
+}
+
+///|
+test "range and batch APIs reject unsafe or invalid input" {
+  assert_true(RoaringBitmap::from_range(4, 3) is Err(InvalidRange(4, 3)))
+  assert_true(
+    RoaringBitmap::from_range(0, 1_000_001) is Err(RangeTooLarge(1_000_001)),
+  )
+  let bitmap = RoaringBitmap::from_array([2, 4]).unwrap()
+  assert_true(bitmap.remove_all([4, -1]) is Err(NegativeValue(-1)))
+}
+
+///|
+test "deterministic property corpus preserves set laws and codec round trips" {
+  for seed in 0..<64 {
+    let left_values : Array[Int] = []
+    let right_values : Array[Int] = []
+    for index in 0..<48 {
+      left_values.push((seed * 997 + index * 7_919) % 140_000)
+      right_values.push((seed * 1_309 + index * 6_151 + 23) % 140_000)
+    }
+    let left = RoaringBitmap::from_array(left_values).unwrap()
+    let right = RoaringBitmap::from_array(right_values).unwrap()
+    assert_eq(left.union(right).to_array(), right.union(left).to_array())
+    assert_eq(
+      left.intersection(right).to_array(),
+      right.intersection(left).to_array(),
+    )
+    assert_eq(left.union(left).to_array(), left.to_array())
+    assert_true(left.difference(left).is_empty())
+    assert_eq(
+      left.intersection(right).to_array(),
+      left.difference(left.difference(right)).to_array(),
+    )
+    assert_eq(
+      decode_words(left.encode_words()).unwrap().to_array(),
+      left.to_array(),
+    )
+  }
+}
