@@ -22,6 +22,12 @@ pub(all) enum CodecError {
   NonCanonicalPayload
 }
 
+pub(all) enum ContainerKind {
+  Array
+  Bitmap
+  Run
+}
+
 pub(all) struct IntRange {
   start : Int
   end : Int
@@ -34,6 +40,7 @@ pub fn RoaringBitmap::add(Self, Int) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::add_all(Self, Array[Int]) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::add_range(Self, Int, Int) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::add_ranges(Self, Array[IntRange]) -> Result[Self, RoaringError]
+pub fn RoaringBitmap::block_stats(Self) -> Array[RoaringBlockStats]
 pub fn RoaringBitmap::cardinality(Self) -> Int
 pub fn RoaringBitmap::contains(Self, Int) -> Bool
 pub fn RoaringBitmap::contains_range(Self, Int, Int) -> Result[Bool, RoaringError]
@@ -66,6 +73,12 @@ pub fn RoaringBitmap::union(Self, Self) -> Self
 pub fn RoaringBitmap::xor(Self, Self) -> Self
 
 type RoaringBlock
+
+pub(all) struct RoaringBlockStats {
+  key : Int
+  cardinality : Int
+  kind : ContainerKind
+}
 
 pub struct RoaringBuilder {
   values : Array[Int]

@@ -25,6 +25,24 @@ test "dense blocks use bitmap storage without changing rank or select" {
 }
 
 ///|
+test "block diagnostics expose selected representations without internals" {
+  let values : Array[Int] = [1]
+  for value in 70_000..<70_006 {
+    values.push(value)
+  }
+  for value in 131_072..<136_072 {
+    values.push(value)
+  }
+  let blocks = RoaringBitmap::from_array(values).unwrap().block_stats()
+  assert_eq(blocks.length(), 3)
+  assert_eq(blocks[0].key, 0)
+  assert_true(blocks[0].kind is Array)
+  assert_true(blocks[1].kind is Run)
+  assert_eq(blocks[1].cardinality, 6)
+  assert_true(blocks[2].kind is Bitmap)
+}
+
+///|
 test "non-negative boundary and removal are checked" {
   let bitmap = RoaringBitmap::new().add(2_147_483_647).unwrap()
   assert_true(bitmap.contains(2_147_483_647))

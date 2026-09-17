@@ -47,6 +47,22 @@ pub(all) struct RoaringStats {
 }
 
 ///|
+/// Public classification of the representation selected for one high block.
+pub(all) enum ContainerKind {
+  Array
+  Bitmap
+  Run
+}
+
+///|
+/// Read-only diagnostics for one high-16-bit block.
+pub(all) struct RoaringBlockStats {
+  key : Int
+  cardinality : Int
+  kind : ContainerKind
+}
+
+///|
 let block_size = 65_536
 
 ///|
@@ -156,6 +172,28 @@ pub fn RoaringBitmap::stats(self : RoaringBitmap) -> RoaringStats {
     run_blocks: runs,
     cardinality: self.cardinality(),
   }
+}
+
+///|
+/// Describe the selected representation of every block in ascending key order.
+/// This is intended for observability and test tooling, not mutation.
+pub fn RoaringBitmap::block_stats(
+  self : RoaringBitmap,
+) -> Array[RoaringBlockStats] {
+  let output : Array[RoaringBlockStats] = []
+  for block in self.blocks {
+    let kind = match block.container {
+      ArrayContainer(_) => ContainerKind::Array
+      BitmapContainer(_, _) => ContainerKind::Bitmap
+      RunContainer(_, _) => ContainerKind::Run
+    }
+    output.push({
+      key: block.key,
+      cardinality: block.container.cardinality(),
+      kind,
+    })
+  }
+  output
 }
 
 ///|
