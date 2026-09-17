@@ -25,8 +25,32 @@ Run checks and the example:
 ```text
 moon check --deny-warn
 moon test --deny-warn
+moon bench --release --deny-warn
 moon run cmd/main
 ```
+
+## Implemented API boundaries
+
+- `from_range`, `add_range`, and `remove_range` use half-open ranges and reject
+  negative, inverted, and ranges longer than 1,000,000 values. The limit is a
+  deliberate safety boundary while ranges are materialized.
+- `add_all` and `remove_all` validate a whole batch before returning a new,
+  immutable bitmap; invalid input returns an error rather than silently
+  changing the batch.
+- `cursor().next()` traverses values in ascending order without exposing the
+  internal container representation.
+- `encode_words` and `decode_words` implement a deterministic, versioned word
+  encoding: `[1, cardinality, ..strictly_ascending_values]`. The decoder
+  rejects bad versions, incorrect lengths, negative values, duplicates, and
+  non-canonical order. This is deliberately *not* CRoaring binary format.
+- Union, intersection, difference, and xor merge high-16-bit blocks first and
+  dispatch matching keys to container-local operations.
+
+The test suite includes fixed boundary tests plus a deterministic 64-case
+property corpus covering commutativity, idempotence, cancellation, and
+encode/decode round trips. `roaring_bench.mbt` contains reproducible dense
+block workloads for `moon bench`; its numbers are measurements for the local
+toolchain and machine, not portable performance claims.
 
 ## Scope and provenance
 
@@ -41,4 +65,4 @@ cross-target boundary tests are implemented.
 
 ## License
 
-Apache-2.0. The repository will include the full license text before release.
+Apache-2.0; the complete text is in [LICENSE](LICENSE).
