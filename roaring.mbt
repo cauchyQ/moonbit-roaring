@@ -623,8 +623,20 @@ fn Container::contains(self : Container, low : Int) -> Bool {
 fn Container::rank(self : Container, low : Int) -> Int {
   match self {
     ArrayContainer(values) => values.filter(value => value <= low).length()
-    BitmapContainer(_, _) =>
-      self.values().filter(value => value <= low).length()
+    BitmapContainer(words, _) => {
+      let mut total = 0
+      let word_index = low / word_bits
+      for index in 0..<word_index {
+        total += count_word_bits(words[index])
+      }
+      let word = words[word_index]
+      for bit in 0..<(low % word_bits + 1) {
+        if (word & (1 << bit)) != 0 {
+          total += 1
+        }
+      }
+      total
+    }
     RunContainer(runs, _) => {
       let mut total = 0
       for run in runs {
@@ -650,7 +662,24 @@ fn Container::rank(self : Container, low : Int) -> Int {
 fn Container::select(self : Container, index : Int) -> Int? {
   match self {
     ArrayContainer(values) => Some(values[index])
-    BitmapContainer(_, _) => Some(self.values()[index])
+    BitmapContainer(words, _) => {
+      let mut remaining = index
+      for word_index in 0..<words.length() {
+        let count = count_word_bits(words[word_index])
+        if remaining < count {
+          for bit in 0..<word_bits {
+            if (words[word_index] & (1 << bit)) != 0 {
+              if remaining == 0 {
+                return Some(word_index * word_bits + bit)
+              }
+              remaining -= 1
+            }
+          }
+        }
+        remaining -= count
+      }
+      None
+    }
     RunContainer(runs, _) => {
       let mut remaining = index
       for run in runs {
@@ -683,6 +712,18 @@ fn Container::maximum(self : Container) -> Int? {
     BitmapContainer(_, count) => self.select(count - 1)
     RunContainer(runs, _) => Some(runs[runs.length() - 1].end)
   }
+}
+
+///|
+/// Count set bits without relying on a target-specific unsigned integer API.
+fn count_word_bits(word : Int) -> Int {
+  let mut total = 0
+  for bit in 0..<word_bits {
+    if (word & (1 << bit)) != 0 {
+      total += 1
+    }
+  }
+  total
 }
 
 ///|
