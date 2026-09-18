@@ -30,6 +30,9 @@ test (b : @bench.T) {
   b.bench(name="encode_canonical_words", fn() {
     b.keep(left.encode_words().length())
   })
+  b.bench(name="encode_run_words", fn() {
+    b.keep(left.encode_run_words().unwrap().length())
+  })
   b.bench(name="rank_dense_bitmap", fn() { b.keep(left.rank(12_345)) })
   b.bench(name="select_dense_bitmap", fn() { b.keep(left.select(4_000)) })
 }

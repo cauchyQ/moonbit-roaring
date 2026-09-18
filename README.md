@@ -54,6 +54,10 @@ moon run cmd/main
   encoding: `[1, cardinality, ..strictly_ascending_values]`. The decoder
   rejects bad versions, incorrect lengths, negative values, duplicates, and
   non-canonical order. This is deliberately *not* CRoaring binary format.
+- `encode_run_words` and `decode_run_words` provide a second deterministic
+  format for interval-heavy data: `[3, cardinality, run_count, start, length,
+  ...]`. Decoding is bounded to 1,000,000 materialized members and rejects
+  overflow, overlap, and adjacent runs that would be non-canonical.
 - Union, intersection, difference, and xor merge high-16-bit blocks first and
   dispatch matching keys to container-local operations.
 - Point membership, extrema, `rank`, and `select` stay at block/container

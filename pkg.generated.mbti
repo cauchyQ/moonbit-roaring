@@ -2,6 +2,8 @@
 package "cauchyQ/moonbit-roaring"
 
 // Values
+pub fn decode_run_words(Array[Int]) -> Result[RoaringBitmap, CodecError]
+
 pub fn decode_words(Array[Int]) -> Result[RoaringBitmap, CodecError]
 
 pub fn intersection_all(Array[RoaringBitmap]) -> RoaringBitmap
@@ -19,6 +21,9 @@ pub(all) enum CodecError {
   InvalidCount(Int)
   InvalidPayloadLength(Int, Int)
   InvalidValue(Int)
+  InvalidRunLength(Int)
+  CardinalityMismatch(Int, Int)
+  PayloadTooLarge(Int)
   NonCanonicalPayload
 }
 
@@ -47,6 +52,7 @@ pub fn RoaringBitmap::contains_range(Self, Int, Int) -> Result[Bool, RoaringErro
 pub fn RoaringBitmap::count_in_range(Self, Int, Int) -> Result[Int, RoaringError]
 pub fn RoaringBitmap::cursor(Self) -> RoaringCursor
 pub fn RoaringBitmap::difference(Self, Self) -> Self
+pub fn RoaringBitmap::encode_run_words(Self) -> Result[Array[Int], CodecError]
 pub fn RoaringBitmap::encode_words(Self) -> Array[Int]
 pub fn RoaringBitmap::from_array(Array[Int]) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::from_range(Int, Int) -> Result[Self, RoaringError]

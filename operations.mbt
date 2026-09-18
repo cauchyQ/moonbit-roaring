@@ -96,6 +96,9 @@ pub(all) enum CodecError {
   InvalidCount(Int)
   InvalidPayloadLength(Int, Int)
   InvalidValue(Int)
+  InvalidRunLength(Int)
+  CardinalityMismatch(Int, Int)
+  PayloadTooLarge(Int)
   NonCanonicalPayload
 }
 
@@ -438,5 +441,106 @@ pub fn decode_words(words : Array[Int]) -> Result[RoaringBitmap, CodecError] {
     Err(NonCanonicalPayload)
   } else {
     Ok(bitmap)
+  }
+}
+
+///|
+/// Encode consecutive values as stable runs: `[3, cardinality, run_count,
+/// start_0, length_0, ...]`.
+///
+/// This format is compact for interval-heavy data. Its explicit size ceiling
+/// prevents a tiny hostile input from requesting an unbounded allocation.
+pub fn RoaringBitmap::encode_run_words(
+  self : RoaringBitmap,
+) -> Result[Array[Int], CodecError] {
+  let cardinality = self.cardinality()
+  if cardinality > max_materialized_range {
+    return Err(PayloadTooLarge(cardinality))
+  }
+  let values = self.to_array()
+  let starts : Array[Int] = []
+  let lengths : Array[Int] = []
+  if values.length() > 0 {
+    let mut start = values[0]
+    let mut previous = start
+    for index in 1..<values.length() {
+      let value = values[index]
+      if value != previous + 1 {
+        starts.push(start)
+        lengths.push(previous - start + 1)
+        start = value
+      }
+      previous = value
+    }
+    starts.push(start)
+    lengths.push(previous - start + 1)
+  }
+  let output : Array[Int] = [3, cardinality, starts.length()]
+  for index in 0..<starts.length() {
+    output.push(starts[index])
+    output.push(lengths[index])
+  }
+  Ok(output)
+}
+
+///|
+/// Decode canonical run words and reject overlaps, adjacency, overflow, and
+/// payloads exceeding the documented safety ceiling.
+pub fn decode_run_words(
+  words : Array[Int],
+) -> Result[RoaringBitmap, CodecError] {
+  if words.length() == 0 {
+    return Err(MissingHeader)
+  }
+  if words[0] != 3 {
+    return Err(UnsupportedVersion(words[0]))
+  }
+  if words.length() < 3 || words[1] < 0 || words[2] < 0 {
+    return Err(InvalidCount(if words.length() < 2 { -1 } else { words[1] }))
+  }
+  let cardinality = words[1]
+  let run_count = words[2]
+  if cardinality > max_materialized_range {
+    return Err(PayloadTooLarge(cardinality))
+  }
+  let payload_length = words.length() - 3
+  if payload_length % 2 != 0 || run_count != payload_length / 2 {
+    return Err(InvalidPayloadLength(run_count * 2, payload_length))
+  }
+  let values : Array[Int] = []
+  let mut total = 0
+  let mut previous_end = -1
+  for index in 0..<run_count {
+    let start = words[3 + index * 2]
+    let length = words[4 + index * 2]
+    if start < 0 {
+      return Err(InvalidValue(start))
+    }
+    if length <= 0 {
+      return Err(InvalidRunLength(length))
+    }
+    if length - 1 > 2_147_483_647 - start {
+      return Err(InvalidValue(start))
+    }
+    if length > max_materialized_range - total {
+      return Err(PayloadTooLarge(total + length))
+    }
+    let end = start + length - 1
+    if previous_end >= 0 &&
+      (previous_end == 2_147_483_647 || start <= previous_end + 1) {
+      return Err(NonCanonicalPayload)
+    }
+    for value in start..<=end {
+      values.push(value)
+    }
+    total += length
+    previous_end = end
+  }
+  if total != cardinality {
+    return Err(CardinalityMismatch(cardinality, total))
+  }
+  match RoaringBitmap::from_array(values) {
+    Ok(bitmap) => Ok(bitmap)
+    Err(_) => Err(NonCanonicalPayload)
   }
 }

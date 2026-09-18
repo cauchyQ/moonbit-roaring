@@ -118,6 +118,28 @@ test "codec rejects invalid version count and noncanonical input" {
 }
 
 ///|
+test "run words are stable compact and reject malformed runs" {
+  let bitmap = RoaringBitmap::from_ranges([
+    { start: 2, end: 8 },
+    { start: 70_000, end: 70_004 },
+  ]).unwrap()
+  let words = bitmap.encode_run_words().unwrap()
+  assert_eq(words, [3, 10, 2, 2, 6, 70_000, 4])
+  assert_eq(decode_run_words(words).unwrap().to_array(), bitmap.to_array())
+  assert_true(decode_run_words([3, 1, 1, 2, 0]) is Err(InvalidRunLength(0)))
+  assert_true(
+    decode_run_words([3, 2, 1, 2, 1]) is Err(CardinalityMismatch(2, 1)),
+  )
+  assert_true(
+    decode_run_words([3, 2, 2, 2, 1, 3, 1]) is Err(NonCanonicalPayload),
+  )
+  assert_true(
+    decode_run_words([3, 1_000_001, 1, 0, 1_000_001])
+    is Err(PayloadTooLarge(1_000_001)),
+  )
+}
+
+///|
 test "range and batch APIs reject unsafe or invalid input" {
   assert_true(RoaringBitmap::from_range(4, 3) is Err(InvalidRange(4, 3)))
   assert_true(
