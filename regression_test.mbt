@@ -248,3 +248,29 @@ test "end to end catalog plan patch log and frame workflow is reproducible" {
   assert_eq(encoded.decode().unwrap().to_array(), updated.to_array())
   assert_true(updated.validate() is Ok(_))
 }
+
+///|
+test "catalog query metadata preserves repeated references and nesting depth" {
+  let query = CatalogQuery::Any([
+    CatalogQuery::Key(1),
+    CatalogQuery::Not(
+      CatalogQuery::All([
+        CatalogQuery::Key(2),
+        CatalogQuery::AtLeast(1, [CatalogQuery::Key(1), CatalogQuery::Key(3)]),
+      ]),
+    ),
+  ])
+  let keys = query.referenced_keys()
+  assert_eq(keys, [1, 2, 1, 3])
+  let stats = query.stats()
+  assert_eq(stats.nodes, 8)
+  assert_eq(stats.depth, 5)
+  assert_eq(stats.key_references, 4)
+  let universe = RoaringBitmap::from_array([1, 2, 3]).unwrap()
+  let catalog = BitmapCatalog::new()
+    .upsert(1, RoaringBitmap::from_array([1]).unwrap())
+    .upsert(2, RoaringBitmap::from_array([2]).unwrap())
+  let traced = catalog.evaluate_traced(query, universe)
+  assert_eq(traced.missing_keys, [3])
+  assert_eq(traced.bitmap.to_array(), [1, 2, 3])
+}
