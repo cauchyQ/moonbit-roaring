@@ -165,6 +165,56 @@ test "patches transform and reverse a bitmap without retaining base state" {
 }
 
 ///|
+test "transforms preserve normalization and enforce integer boundaries" {
+  let bitmap = RoaringBitmap::from_array([1, 2, 3, 4, 8]).unwrap()
+  assert_eq(bitmap.filter(value => value % 2 == 0).to_array(), [2, 4, 8])
+  assert_eq(bitmap.map_values(value => value / 2).unwrap().to_array(), [
+    0, 1, 2, 4,
+  ])
+  let (even, odd) = bitmap.partition(value => value % 2 == 0)
+  assert_eq(even.to_array(), [2, 4, 8])
+  assert_eq(odd.to_array(), [1, 3])
+  assert_eq(bitmap.take(3).to_array(), [1, 2, 3])
+  assert_eq(bitmap.drop(3).to_array(), [4, 8])
+  assert_eq(bitmap.slice_positions(1, 4).unwrap().to_array(), [2, 3, 4])
+  assert_eq(bitmap.shift(10).unwrap().to_array(), [11, 12, 13, 14, 18])
+  assert_true(bitmap.shift(-2) is Err(NegativeValue(-1)))
+}
+
+///|
+test "operation log replays in order and compacts only after success" {
+  let base = RoaringBitmap::from_array([1, 4]).unwrap()
+  let log = RoaringOperationLog::new(base)
+    .append(Add(2))
+    .append(AddRange(5, 8))
+    .append(Remove(4))
+    .append(RemoveAll([6, 99]))
+  assert_eq(log.len(), 4)
+  assert_eq(log.replay().unwrap().to_array(), [1, 2, 5, 7])
+  let compacted = log.compact().unwrap()
+  assert_eq(compacted.len(), 0)
+  assert_eq(compacted.replay().unwrap().to_array(), [1, 2, 5, 7])
+  let invalid = log.append(Add(-1))
+  assert_true(invalid.replay() is Err(NegativeValue(-1)))
+}
+
+///|
+test "analytics exposes exact ratios and stable positional samples" {
+  let bitmap = RoaringBitmap::from_array([2, 4, 8, 16, 32]).unwrap()
+  let profile = bitmap.profile()
+  assert_eq(profile.cardinality, 5)
+  assert_eq(profile.minimum, Some(2))
+  assert_eq(profile.maximum, Some(32))
+  assert_eq(profile.span, 31)
+  assert_eq(bitmap.sample_evenly(3), [2, 4, 16])
+  assert_eq(bitmap.sample_evenly(99), [2, 4, 8, 16, 32])
+  assert_true(bitmap.quantile(1, 2) is Ok(Some(8)))
+  assert_true(bitmap.quantile(2, 1) is Err(InvalidRange(2, 1)))
+  let other = RoaringBitmap::from_array([4, 8, 64]).unwrap()
+  assert_eq(bitmap.jaccard_parts(other), (2, 6))
+}
+
+///|
 test "range and batch APIs reject unsafe or invalid input" {
   assert_true(RoaringBitmap::from_range(4, 3) is Err(InvalidRange(4, 3)))
   assert_true(

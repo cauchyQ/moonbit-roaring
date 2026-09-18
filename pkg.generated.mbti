@@ -15,6 +15,24 @@ pub fn xor_all(Array[RoaringBitmap]) -> RoaringBitmap
 // Errors
 
 // Types and methods
+pub(all) enum BitmapOperation {
+  Add(Int)
+  Remove(Int)
+  AddRange(Int, Int)
+  RemoveRange(Int, Int)
+  AddAll(Array[Int])
+  RemoveAll(Array[Int])
+}
+pub fn BitmapOperation::apply(Self, RoaringBitmap) -> Result[RoaringBitmap, RoaringError]
+
+pub(all) struct BitmapProfile {
+  cardinality : Int
+  minimum : Int?
+  maximum : Int?
+  span : Int
+  block_count : Int
+}
+
 pub(all) enum CodecError {
   MissingHeader
   UnsupportedVersion(Int)
@@ -53,8 +71,10 @@ pub fn RoaringBitmap::count_in_range(Self, Int, Int) -> Result[Int, RoaringError
 pub fn RoaringBitmap::cursor(Self) -> RoaringCursor
 pub fn RoaringBitmap::diff_to(Self, Self) -> RoaringPatch
 pub fn RoaringBitmap::difference(Self, Self) -> Self
+pub fn RoaringBitmap::drop(Self, Int) -> Self
 pub fn RoaringBitmap::encode_run_words(Self) -> Result[Array[Int], CodecError]
 pub fn RoaringBitmap::encode_words(Self) -> Array[Int]
+pub fn RoaringBitmap::filter(Self, (Int) -> Bool) -> Self
 pub fn RoaringBitmap::from_array(Array[Int]) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::from_range(Int, Int) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::from_ranges(Array[IntRange]) -> Result[Self, RoaringError]
@@ -62,18 +82,27 @@ pub fn RoaringBitmap::intersection(Self, Self) -> Self
 pub fn RoaringBitmap::intersects(Self, Self) -> Bool
 pub fn RoaringBitmap::is_empty(Self) -> Bool
 pub fn RoaringBitmap::is_subset_of(Self, Self) -> Bool
+pub fn RoaringBitmap::jaccard_parts(Self, Self) -> (Int, Int)
+pub fn RoaringBitmap::map_values(Self, (Int) -> Int) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::maximum(Self) -> Int?
 pub fn RoaringBitmap::minimum(Self) -> Int?
 pub fn RoaringBitmap::new() -> Self
 pub fn RoaringBitmap::next_at_or_after(Self, Int) -> Int?
+pub fn RoaringBitmap::partition(Self, (Int) -> Bool) -> (Self, Self)
 pub fn RoaringBitmap::previous_at_or_before(Self, Int) -> Int?
+pub fn RoaringBitmap::profile(Self) -> BitmapProfile
+pub fn RoaringBitmap::quantile(Self, Int, Int) -> Result[Int?, RoaringError]
 pub fn RoaringBitmap::rank(Self, Int) -> Int
 pub fn RoaringBitmap::remove(Self, Int) -> Self
 pub fn RoaringBitmap::remove_all(Self, Array[Int]) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::remove_range(Self, Int, Int) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::remove_ranges(Self, Array[IntRange]) -> Result[Self, RoaringError]
+pub fn RoaringBitmap::sample_evenly(Self, Int) -> Array[Int]
 pub fn RoaringBitmap::select(Self, Int) -> Int?
+pub fn RoaringBitmap::shift(Self, Int) -> Result[Self, RoaringError]
+pub fn RoaringBitmap::slice_positions(Self, Int, Int) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::stats(Self) -> RoaringStats
+pub fn RoaringBitmap::take(Self, Int) -> Self
 pub fn RoaringBitmap::to_array(Self) -> Array[Int]
 pub fn RoaringBitmap::to_ranges(Self) -> Result[Array[IntRange], RoaringError]
 pub fn RoaringBitmap::union(Self, Self) -> Self
@@ -113,6 +142,16 @@ pub(all) enum RoaringError {
   RangeTooLarge(Int)
   RangeEndpointOverflow(Int)
 }
+
+pub struct RoaringOperationLog {
+  checkpoint : RoaringBitmap
+  operations : Array[BitmapOperation]
+}
+pub fn RoaringOperationLog::append(Self, BitmapOperation) -> Self
+pub fn RoaringOperationLog::compact(Self) -> Result[Self, RoaringError]
+pub fn RoaringOperationLog::len(Self) -> Int
+pub fn RoaringOperationLog::new(RoaringBitmap) -> Self
+pub fn RoaringOperationLog::replay(Self) -> Result[RoaringBitmap, RoaringError]
 
 pub struct RoaringPatch {
   additions : RoaringBitmap
