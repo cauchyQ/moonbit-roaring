@@ -2,9 +2,15 @@
 package "cauchyQ/moonbit-roaring"
 
 // Values
+pub fn analyze_batch(Array[RoaringBitmap]) -> BitmapBatchReport
+
+pub fn compare_bitmaps(RoaringBitmap, RoaringBitmap) -> BitmapComparison
+
 pub fn decode(CodecFormat, Array[Int]) -> Result[RoaringBitmap, CodecError]
 
 pub fn decode_auto(Array[Int]) -> Result[RoaringBitmap, CodecError]
+
+pub fn decode_operation_log(RoaringBitmap, Array[Int]) -> Result[RoaringOperationLog, JournalCodecError]
 
 pub fn decode_run_words(Array[Int]) -> Result[RoaringBitmap, CodecError]
 
@@ -12,28 +18,62 @@ pub fn decode_words(Array[Int]) -> Result[RoaringBitmap, CodecError]
 
 pub fn detect_codec(Array[Int]) -> Result[CodecFormat, CodecError]
 
+pub fn equal_within(RoaringBitmap, RoaringBitmap, RoaringBitmap) -> Bool
+
+pub fn f1_parts(RoaringBitmap, RoaringBitmap) -> (Int, Int)
+
 pub fn intersection_all(Array[RoaringBitmap]) -> RoaringBitmap
+
+pub fn overlap_with_others(Array[RoaringBitmap]) -> Array[Int]
+
+pub fn precision_parts(RoaringBitmap, RoaringBitmap) -> (Int, Int)
+
+pub fn recall_parts(RoaringBitmap, RoaringBitmap) -> (Int, Int)
 
 pub fn transcode(Array[Int], CodecFormat, CodecFormat) -> Result[Array[Int], CodecError]
 
 pub fn union_all(Array[RoaringBitmap]) -> RoaringBitmap
+
+pub fn values_at_least(Array[RoaringBitmap], Int) -> RoaringBitmap
+
+pub fn values_in_exactly_one(Array[RoaringBitmap]) -> RoaringBitmap
 
 pub fn xor_all(Array[RoaringBitmap]) -> RoaringBitmap
 
 // Errors
 
 // Types and methods
+pub(all) struct BitmapBatchReport {
+  operand_count : Int
+  total_cardinality : Int
+  union_cardinality : Int
+  intersection_cardinality : Int
+  duplicate_occurrences : Int
+  empty_operands : Int
+}
+
 pub struct BitmapCatalog {
   entries : Array[BitmapEntry]
 }
 pub fn BitmapCatalog::evaluate(Self, CatalogQuery, RoaringBitmap) -> RoaringBitmap
 pub fn BitmapCatalog::evaluate_traced(Self, CatalogQuery, RoaringBitmap) -> CatalogQueryResult
+pub fn BitmapCatalog::execute_with_trace(Self, CatalogQuery, RoaringBitmap) -> QueryExecutionTrace
 pub fn BitmapCatalog::get(Self, Int) -> RoaringBitmap?
 pub fn BitmapCatalog::keys(Self) -> Array[Int]
 pub fn BitmapCatalog::len(Self) -> Int
 pub fn BitmapCatalog::new() -> Self
 pub fn BitmapCatalog::remove(Self, Int) -> Self
 pub fn BitmapCatalog::upsert(Self, Int, RoaringBitmap) -> Self
+
+pub(all) struct BitmapComparison {
+  relation : SetRelation
+  left_cardinality : Int
+  right_cardinality : Int
+  common_cardinality : Int
+  left_only_cardinality : Int
+  right_only_cardinality : Int
+  union_cardinality : Int
+}
 
 pub(all) struct BitmapEntry {
   key : Int
@@ -94,6 +134,7 @@ pub(all) enum CatalogQuery {
   AtLeast(Int, Array[CatalogQuery])
 }
 pub fn CatalogQuery::referenced_keys(Self) -> Array[Int]
+pub fn CatalogQuery::result_upper_bound(Self, BitmapCatalog, RoaringBitmap) -> Int
 pub fn CatalogQuery::stats(Self) -> CatalogQueryStats
 
 pub(all) struct CatalogQueryResult {
@@ -138,6 +179,29 @@ pub(all) enum FrameError {
 pub(all) struct IntRange {
   start : Int
   end : Int
+}
+
+pub(all) enum JournalCodecError {
+  MissingHeader
+  UnsupportedVersion(Int)
+  InvalidOperationCount(Int)
+  InvalidTag(Int)
+  TruncatedPayload(Int)
+  InvalidBatchCount(Int)
+}
+
+pub(all) enum JournalRangeError {
+  InvalidIndex(Int, Int)
+}
+
+pub(all) struct QueryExecutionTrace {
+  result : RoaringBitmap
+  nodes : Int
+  depth : Int
+  requested_keys : Array[Int]
+  resolved_keys : Array[Int]
+  missing_keys : Array[Int]
+  result_cardinality : Int
 }
 
 pub struct RoaringBitmap {
@@ -249,15 +313,21 @@ pub struct RoaringOperationLog {
 }
 pub fn RoaringOperationLog::append(Self, BitmapOperation) -> Self
 pub fn RoaringOperationLog::append_all(Self, Array[BitmapOperation]) -> Self
+pub fn RoaringOperationLog::cardinality_history(Self) -> Array[Int]
 pub fn RoaringOperationLog::checkpoint(Self) -> RoaringBitmap
+pub fn RoaringOperationLog::checkpoint_frame(Self, CodecFormat) -> Result[BitmapFrame, RoaringError]
 pub fn RoaringOperationLog::compact(Self) -> Result[Self, RoaringError]
 pub fn RoaringOperationLog::discard_pending(Self) -> Self
+pub fn RoaringOperationLog::encode_words(Self) -> Array[Int]
 pub fn RoaringOperationLog::is_compacted(Self) -> Bool
 pub fn RoaringOperationLog::len(Self) -> Int
 pub fn RoaringOperationLog::new(RoaringBitmap) -> Self
+pub fn RoaringOperationLog::operation_at(Self, Int) -> Result[BitmapOperation, JournalRangeError]
 pub fn RoaringOperationLog::operations(Self) -> Array[BitmapOperation]
 pub fn RoaringOperationLog::pending_patch(Self) -> Result[RoaringPatch, RoaringError]
 pub fn RoaringOperationLog::replay(Self) -> Result[RoaringBitmap, RoaringError]
+pub fn RoaringOperationLog::replay_prefix(Self, Int) -> Result[RoaringBitmap, JournalRangeError]
+pub fn RoaringOperationLog::split_at(Self, Int) -> Result[(Self, Self), JournalRangeError]
 
 pub struct RoaringPatch {
   additions : RoaringBitmap
@@ -269,6 +339,20 @@ pub fn RoaringPatch::invert(Self) -> Self
 pub fn RoaringPatch::is_empty(Self) -> Bool
 pub fn RoaringPatch::removed_cardinality(Self) -> Int
 pub fn RoaringPatch::touched(Self) -> RoaringBitmap
+
+pub struct RoaringSnapshot {
+  generation : Int
+  bitmap : RoaringBitmap
+}
+pub fn RoaringSnapshot::advance(Self, RoaringPatch) -> Result[Self, SnapshotError]
+pub fn RoaringSnapshot::apply_patch_envelope(Self, SnapshotPatchEnvelope) -> Result[Self, SnapshotError]
+pub fn RoaringSnapshot::at(Int, RoaringBitmap) -> Result[Self, SnapshotError]
+pub fn RoaringSnapshot::bitmap(Self) -> RoaringBitmap
+pub fn RoaringSnapshot::diff_to(Self, Self) -> RoaringPatch
+pub fn RoaringSnapshot::envelope(Self, CodecFormat) -> Result[SnapshotEnvelope, CodecError]
+pub fn RoaringSnapshot::generation(Self) -> Int
+pub fn RoaringSnapshot::new(RoaringBitmap) -> Self
+pub fn RoaringSnapshot::patch_envelope(Self, Self, CodecFormat) -> Result[SnapshotPatchEnvelope, CodecError]
 
 pub(all) struct RoaringStats {
   block_count : Int
@@ -285,6 +369,29 @@ pub(all) enum SetRelation {
   Overlap
   Disjoint
 }
+
+pub(all) struct SnapshotEnvelope {
+  generation : Int
+  frame : BitmapFrame
+}
+pub fn SnapshotEnvelope::decode(Self) -> Result[RoaringSnapshot, SnapshotError]
+pub fn SnapshotEnvelope::generation(Self) -> Int
+
+pub(all) enum SnapshotError {
+  InvalidGeneration(Int)
+  GenerationOverflow(Int)
+  StaleGeneration(Int, Int)
+  Frame(FrameError)
+}
+
+pub(all) struct SnapshotPatchEnvelope {
+  base_generation : Int
+  target_generation : Int
+  additions : BitmapFrame
+  removals : BitmapFrame
+}
+pub fn SnapshotPatchEnvelope::base_generation(Self) -> Int
+pub fn SnapshotPatchEnvelope::target_generation(Self) -> Int
 
 pub(all) enum ValidationError {
   UnsortedBlockKey(Int, Int)

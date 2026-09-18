@@ -286,3 +286,250 @@ test "relation helpers agree on empty sets" {
   assert_true(empty.is_disjoint(value))
   assert_eq(empty.union_cardinality(value), 1)
 }
+
+///|
+test "query trace records stable key resolution and conservative bounds" {
+  let universe = RoaringBitmap::from_array([1, 2, 3, 4, 5]).unwrap()
+  let catalog = BitmapCatalog::new()
+    .upsert(1, RoaringBitmap::from_array([1, 2]).unwrap())
+    .upsert(2, RoaringBitmap::from_array([2, 3, 4]).unwrap())
+  let query = CatalogQuery::Any([
+    CatalogQuery::Key(1),
+    CatalogQuery::Key(9),
+    CatalogQuery::Key(2),
+  ])
+  let trace = catalog.execute_with_trace(query, universe)
+  assert_eq(trace.result.to_array(), [1, 2, 3, 4])
+  assert_eq(trace.requested_keys, [1, 9, 2])
+  assert_eq(trace.resolved_keys, [1, 2])
+  assert_eq(trace.missing_keys, [9])
+  assert_eq(trace.result_cardinality, 4)
+  assert_eq(trace.nodes, 4)
+  assert_eq(trace.depth, 2)
+  assert_eq(query.result_upper_bound(catalog, universe), 5)
+}
+
+///|
+test "snapshots advance by patches and round trip through checked envelopes" {
+  let initial = RoaringSnapshot::new(
+    RoaringBitmap::from_array([1, 2, 4]).unwrap(),
+  )
+  let target = RoaringSnapshot::at(
+    8,
+    RoaringBitmap::from_array([2, 3, 4, 9]).unwrap(),
+  ).unwrap()
+  let patch = initial.diff_to(target)
+  let advanced = initial.advance(patch).unwrap()
+  assert_eq(advanced.generation(), 1)
+  assert_eq(advanced.bitmap().to_array(), [2, 3, 4, 9])
+  let envelope = target.envelope(RunWords).unwrap()
+  assert_eq(envelope.generation(), 8)
+  let restored = envelope.decode().unwrap()
+  assert_eq(restored.generation(), 8)
+  assert_eq(restored.bitmap().to_array(), [2, 3, 4, 9])
+  assert_true(
+    RoaringSnapshot::at(-1, RoaringBitmap::new()) is Err(InvalidGeneration(-1)),
+  )
+}
+
+///|
+test "patch envelopes enforce generation ordering and checked reconstruction" {
+  let base = RoaringSnapshot::at(
+    3,
+    RoaringBitmap::from_array([1, 2, 5]).unwrap(),
+  ).unwrap()
+  let target = RoaringSnapshot::at(
+    7,
+    RoaringBitmap::from_array([2, 3, 5, 8]).unwrap(),
+  ).unwrap()
+  let envelope = base.patch_envelope(target, PlainWords).unwrap()
+  assert_eq(envelope.base_generation(), 3)
+  assert_eq(envelope.target_generation(), 7)
+  let applied = base.apply_patch_envelope(envelope).unwrap()
+  assert_eq(applied.generation(), 7)
+  assert_eq(applied.bitmap().to_array(), [2, 3, 5, 8])
+  let stale = RoaringSnapshot::at(4, base.bitmap()).unwrap()
+  assert_true(
+    stale.apply_patch_envelope(envelope) is Err(StaleGeneration(4, 3)),
+  )
+}
+
+///|
+test "batch analysis reports exact aggregate and occurrence facts" {
+  let a = RoaringBitmap::from_array([1, 2, 4]).unwrap()
+  let b = RoaringBitmap::from_array([2, 3, 4]).unwrap()
+  let c = RoaringBitmap::from_array([4, 5]).unwrap()
+  let report = analyze_batch([a, b, c])
+  assert_eq(report.operand_count, 3)
+  assert_eq(report.total_cardinality, 8)
+  assert_eq(report.union_cardinality, 5)
+  assert_eq(report.intersection_cardinality, 1)
+  assert_eq(report.duplicate_occurrences, 3)
+  assert_eq(values_at_least([a, b, c], 2).to_array(), [2, 4])
+  assert_eq(values_in_exactly_one([a, b, c]).to_array(), [1, 3, 5])
+  assert_eq(overlap_with_others([a, b, c]), [2, 2, 1])
+}
+
+///|
+test "comparison reports precision recall and universe-restricted equality" {
+  let actual = RoaringBitmap::from_array([1, 2, 4, 7]).unwrap()
+  let expected = RoaringBitmap::from_array([2, 3, 4, 8]).unwrap()
+  let report = compare_bitmaps(actual, expected)
+  assert_true(report.relation is Overlap)
+  assert_eq(report.common_cardinality, 2)
+  assert_eq(report.left_only_cardinality, 2)
+  assert_eq(report.right_only_cardinality, 2)
+  assert_eq(report.union_cardinality, 6)
+  assert_eq(precision_parts(actual, expected), (2, 4))
+  assert_eq(recall_parts(actual, expected), (2, 4))
+  assert_eq(f1_parts(actual, expected), (4, 8))
+  assert_true(
+    equal_within(actual, expected, RoaringBitmap::from_array([2, 4]).unwrap()),
+  )
+}
+
+///|
+test "snapshot and patch error paths retain the original immutable state" {
+  let base = RoaringSnapshot::at(
+    1,
+    RoaringBitmap::from_array([1, 2, 3]).unwrap(),
+  ).unwrap()
+  let target = RoaringSnapshot::at(
+    2,
+    RoaringBitmap::from_array([2, 4]).unwrap(),
+  ).unwrap()
+  let envelope = base.patch_envelope(target, RunWords).unwrap()
+  let wrong = RoaringSnapshot::at(0, base.bitmap()).unwrap()
+  assert_true(
+    wrong.apply_patch_envelope(envelope) is Err(StaleGeneration(0, 1)),
+  )
+  assert_eq(base.bitmap().to_array(), [1, 2, 3])
+  let frame = target.envelope(PlainWords).unwrap()
+  let restored = frame.decode().unwrap()
+  assert_eq(restored.bitmap().to_array(), [2, 4])
+  assert_true(
+    RoaringSnapshot::at(-99, base.bitmap()) is Err(InvalidGeneration(-99)),
+  )
+}
+
+///|
+test "batch analysis handles empty and duplicate-heavy operand lists" {
+  let empty = RoaringBitmap::new()
+  let repeated = RoaringBitmap::from_array([1, 2, 3]).unwrap()
+  let report = analyze_batch([empty, repeated, repeated])
+  assert_eq(report.operand_count, 3)
+  assert_eq(report.empty_operands, 1)
+  assert_eq(report.total_cardinality, 6)
+  assert_eq(report.union_cardinality, 3)
+  assert_eq(report.intersection_cardinality, 0)
+  assert_eq(report.duplicate_occurrences, 3)
+  assert_eq(values_at_least([empty, repeated, repeated], 2).to_array(), [
+    1, 2, 3,
+  ])
+  assert_eq(values_at_least([empty, repeated], 3).to_array(), [])
+  assert_eq(values_in_exactly_one([empty, repeated, repeated]).to_array(), [])
+  assert_eq(overlap_with_others([empty, repeated, repeated]), [0, 3, 3])
+}
+
+///|
+test "journal split checkpoint frames and patch inversion compose correctly" {
+  let checkpoint = RoaringBitmap::from_array([1, 5, 9]).unwrap()
+  let log = RoaringOperationLog::new(checkpoint).append_all([
+    Add(2),
+    Remove(5),
+    AddRange(10, 13),
+    RemoveAll([1, 11]),
+  ])
+  let (prefix, suffix) = log.split_at(2).unwrap()
+  let prefix_state = prefix.replay().unwrap()
+  let final_state = suffix.replay().unwrap()
+  assert_eq(prefix_state.to_array(), [1, 2, 9])
+  assert_eq(final_state.to_array(), [2, 9, 10, 12])
+  let frame = suffix.checkpoint_frame(RunWords).unwrap()
+  assert_eq(frame.decode().unwrap().to_array(), final_state.to_array())
+  let patch = prefix_state.diff_to(final_state)
+  assert_eq(
+    patch.invert().apply(final_state).to_array(),
+    prefix_state.to_array(),
+  )
+  assert_eq(patch.touched().to_array(), [1, 10, 12])
+}
+
+///|
+test "query upper bounds remain safe for negation conjunction and threshold" {
+  let universe = RoaringBitmap::from_range(0, 10).unwrap()
+  let catalog = BitmapCatalog::new()
+    .upsert(1, RoaringBitmap::from_array([1, 2, 3]).unwrap())
+    .upsert(2, RoaringBitmap::from_array([2, 3]).unwrap())
+  let negative = CatalogQuery::Not(CatalogQuery::Key(1))
+  let all = CatalogQuery::All([CatalogQuery::Key(1), CatalogQuery::Key(2)])
+  let impossible = CatalogQuery::AtLeast(3, [
+    CatalogQuery::Key(1),
+    CatalogQuery::Key(2),
+  ])
+  assert_eq(negative.result_upper_bound(catalog, universe), 10)
+  assert_eq(all.result_upper_bound(catalog, universe), 2)
+  assert_eq(impossible.result_upper_bound(catalog, universe), 0)
+  assert_true(
+    catalog.execute_with_trace(negative, universe).result_cardinality <= 10,
+  )
+  assert_true(catalog.execute_with_trace(all, universe).result_cardinality <= 2)
+  assert_true(
+    catalog.execute_with_trace(impossible, universe).result.is_empty(),
+  )
+}
+
+///|
+test "comparison analysis and sampling agree on a shared derived result" {
+  let left = RoaringBitmap::from_array([1, 2, 3, 10, 11]).unwrap()
+  let right = RoaringBitmap::from_array([2, 3, 4, 11, 12]).unwrap()
+  let common = left.intersection(right)
+  let comparison = compare_bitmaps(left, right)
+  let batch = analyze_batch([left, right, common])
+  assert_eq(common.to_array(), [2, 3, 11])
+  assert_eq(comparison.common_cardinality, common.cardinality())
+  assert_eq(batch.intersection_cardinality, 3)
+  assert_eq(common.sample_evenly(2), [2, 3])
+  assert_eq(common.sample_stride(2), [2, 11])
+  assert_true(common.validate() is Ok(_))
+  assert_eq(common.cardinality(), 3)
+}
+
+///|
+test "operation journals preserve order batches and malformed boundaries" {
+  let checkpoint = RoaringBitmap::from_array([1, 4, 8]).unwrap()
+  let log = RoaringOperationLog::new(checkpoint).append_all([
+    Add(2),
+    AddRange(10, 12),
+    RemoveAll([4, 99]),
+    AddAll([3, 5]),
+    Remove(8),
+  ])
+  let words = log.encode_words()
+  let decoded = decode_operation_log(checkpoint, words).unwrap()
+  assert_eq(decoded.replay().unwrap().to_array(), [1, 2, 3, 5, 10, 11])
+  assert_true(decode_operation_log(checkpoint, []) is Err(MissingHeader))
+  assert_true(decode_operation_log(checkpoint, [1, 1, 9]) is Err(InvalidTag(9)))
+  assert_true(
+    decode_operation_log(checkpoint, [1, 1, 5, 3, 1])
+    is Err(InvalidBatchCount(3)),
+  )
+}
+
+///|
+test "journal history supports prefix replay split and cardinality audit" {
+  let checkpoint = RoaringBitmap::from_array([1, 4]).unwrap()
+  let log = RoaringOperationLog::new(checkpoint).append_all([
+    Add(2),
+    Remove(4),
+    AddRange(6, 8),
+  ])
+  assert_true(log.operation_at(-1) is Err(InvalidIndex(-1, 3)))
+  assert_true(log.operation_at(3) is Err(InvalidIndex(3, 3)))
+  assert_eq(log.replay_prefix(0).unwrap().to_array(), [1, 4])
+  assert_eq(log.replay_prefix(2).unwrap().to_array(), [1, 2])
+  assert_eq(log.cardinality_history(), [2, 3, 2, 4])
+  let (prefix, suffix) = log.split_at(2).unwrap()
+  assert_eq(prefix.replay().unwrap().to_array(), [1, 2])
+  assert_eq(suffix.replay().unwrap().to_array(), [1, 2, 6, 7])
+}
