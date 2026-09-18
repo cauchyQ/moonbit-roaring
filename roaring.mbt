@@ -30,7 +30,7 @@ priv enum Container {
 
 ///|
 /// Internal word-wise operation used by the dense-container fast path.
-priv enum BitmapOperation {
+priv enum WordOperation {
   Union
   Intersection
   Difference
@@ -576,7 +576,7 @@ fn Container::from_lows(lows : Array[Int]) -> Container {
 fn Container::union(self : Container, other : Container) -> Container {
   match (self, other) {
     (BitmapContainer(left, _), BitmapContainer(right, _)) =>
-      combine_bitmap_words(left, right, BitmapOperation::Union)
+      combine_bitmap_words(left, right, WordOperation::Union)
     _ => Container::from_lows(union_sorted(self.values(), other.values()))
   }
 }
@@ -586,7 +586,7 @@ fn Container::union(self : Container, other : Container) -> Container {
 fn Container::intersection(self : Container, other : Container) -> Container {
   match (self, other) {
     (BitmapContainer(left, _), BitmapContainer(right, _)) =>
-      combine_bitmap_words(left, right, BitmapOperation::Intersection)
+      combine_bitmap_words(left, right, WordOperation::Intersection)
     _ =>
       Container::from_lows(intersection_sorted(self.values(), other.values()))
   }
@@ -597,7 +597,7 @@ fn Container::intersection(self : Container, other : Container) -> Container {
 fn Container::difference(self : Container, other : Container) -> Container {
   match (self, other) {
     (BitmapContainer(left, _), BitmapContainer(right, _)) =>
-      combine_bitmap_words(left, right, BitmapOperation::Difference)
+      combine_bitmap_words(left, right, WordOperation::Difference)
     _ => Container::from_lows(difference_sorted(self.values(), other.values()))
   }
 }
@@ -607,7 +607,7 @@ fn Container::difference(self : Container, other : Container) -> Container {
 fn Container::xor(self : Container, other : Container) -> Container {
   match (self, other) {
     (BitmapContainer(left, _), BitmapContainer(right, _)) =>
-      combine_bitmap_words(left, right, BitmapOperation::Xor)
+      combine_bitmap_words(left, right, WordOperation::Xor)
     _ => {
       let left_only = difference_sorted(self.values(), other.values())
       let right_only = difference_sorted(other.values(), self.values())
@@ -622,7 +622,7 @@ fn Container::xor(self : Container, other : Container) -> Container {
 fn combine_bitmap_words(
   left : Array[Int],
   right : Array[Int],
-  operation : BitmapOperation,
+  operation : WordOperation,
 ) -> Container {
   let words : Array[Int] = []
   let mut cardinality = 0
