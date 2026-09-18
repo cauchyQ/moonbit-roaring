@@ -74,3 +74,43 @@ pub fn RoaringBitmap::quantile(
   }
   Ok(self.select(numerator * (total - 1) / denominator))
 }
+
+///|
+/// Return exact intersection, left-only, right-only, and union cardinalities.
+pub fn RoaringBitmap::overlap_parts(
+  self : RoaringBitmap,
+  other : RoaringBitmap,
+) -> (Int, Int, Int, Int) {
+  let common = self.intersection(other).cardinality()
+  let left_only = self.cardinality() - common
+  let right_only = other.cardinality() - common
+  (common, left_only, right_only, common + left_only + right_only)
+}
+
+///|
+/// Return occupied and total positions in the bitmap's inclusive numeric span.
+pub fn RoaringBitmap::density_parts(self : RoaringBitmap) -> (Int, Int) {
+  let profile = self.profile()
+  (profile.cardinality, profile.span)
+}
+
+///|
+/// Sample each `stride`th ordinal. Non-positive strides return an empty sample.
+pub fn RoaringBitmap::sample_stride(
+  self : RoaringBitmap,
+  stride : Int,
+) -> Array[Int] {
+  let output : Array[Int] = []
+  if stride <= 0 {
+    return output
+  }
+  let mut index = 0
+  while index < self.cardinality() {
+    match self.select(index) {
+      Some(value) => output.push(value)
+      None => ()
+    }
+    index += stride
+  }
+  output
+}

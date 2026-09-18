@@ -215,6 +215,90 @@ test "analytics exposes exact ratios and stable positional samples" {
 }
 
 ///|
+test "relations classify containment overlap and exact cardinality metrics" {
+  let a = RoaringBitmap::from_array([1, 2, 3]).unwrap()
+  let b = RoaringBitmap::from_array([2, 3, 4]).unwrap()
+  let c = RoaringBitmap::from_array([1, 2, 3, 4]).unwrap()
+  let d = RoaringBitmap::from_array([9]).unwrap()
+  assert_true(a.relation_to(a) is Equal)
+  assert_true(a.relation_to(c) is ProperSubset)
+  assert_true(c.relation_to(a) is ProperSuperset)
+  assert_true(a.relation_to(b) is Overlap)
+  assert_true(a.relation_to(d) is Disjoint)
+  assert_true(a.is_proper_subset_of(c))
+  assert_true(c.is_proper_superset_of(a))
+  assert_true(a.is_disjoint(d))
+  assert_eq(a.intersection_cardinality(b), 2)
+  assert_eq(a.union_cardinality(b), 4)
+  assert_eq(a.difference_cardinality(b), 1)
+  assert_eq(a.symmetric_difference_cardinality(b), 2)
+  assert_eq(a.containment_gaps(b), (1, 1))
+  assert_eq(a.overlap_coefficient_parts(b), (2, 3))
+}
+
+///|
+test "catalog queries and plans compose set algebra" {
+  let universe = RoaringBitmap::from_array([1, 2, 3, 4, 5]).unwrap()
+  let catalog = BitmapCatalog::new()
+    .upsert(1, RoaringBitmap::from_array([1, 2, 3]).unwrap())
+    .upsert(2, RoaringBitmap::from_array([2, 3, 4]).unwrap())
+  assert_eq(catalog.evaluate(All([Key(1), Not(Key(2))]), universe).to_array(), [
+    1,
+  ])
+  assert_eq(
+    catalog.evaluate(AtLeast(2, [Key(1), Key(2)]), universe).to_array(),
+    [2, 3],
+  )
+  let plan = BitmapPlan::Take(
+    BitmapPlan::Union(
+      BitmapPlan::Source(catalog.get(1).unwrap()),
+      BitmapPlan::Source(catalog.get(2).unwrap()),
+    ),
+    3,
+  )
+  assert_eq(plan.evaluate().to_array(), [1, 2, 3])
+}
+
+///|
+test "codec dispatch transcodes and preserves malformed input errors" {
+  let bitmap = RoaringBitmap::from_range(10, 20).unwrap()
+  let runs = bitmap.encode(RunWords).unwrap()
+  let plain = transcode(runs, RunWords, PlainWords).unwrap()
+  assert_eq(decode(PlainWords, plain).unwrap().to_array(), bitmap.to_array())
+  assert_true(
+    transcode([1, 2, 7], PlainWords, RunWords)
+    is Err(InvalidPayloadLength(2, 1)),
+  )
+}
+
+///|
+test "validation and frames protect structural and transport boundaries" {
+  let bitmap = RoaringBitmap::from_array([1, 2, 3, 70_000]).unwrap()
+  assert_true(bitmap.validate() is Ok(_))
+  let frame = bitmap.frame(RunWords).unwrap()
+  assert_eq(frame.decode().unwrap().to_array(), bitmap.to_array())
+  assert_true(
+    frame.with_payload([3, 4, 1, 1, 4]).decode() is Err(ChecksumMismatch(_, _)),
+  )
+}
+
+///|
+test "plan static stats do not require execution" {
+  let plan = BitmapPlan::Union(
+    BitmapPlan::Source(RoaringBitmap::from_array([1, 2]).unwrap()),
+    BitmapPlan::Take(
+      BitmapPlan::Source(RoaringBitmap::from_array([2, 3]).unwrap()),
+      1,
+    ),
+  )
+  let stats = plan.stats()
+  assert_eq(stats.nodes, 4)
+  assert_eq(stats.depth, 3)
+  assert_eq(stats.sources, 2)
+  assert_eq(plan.describe(), "union(source(2),take(1,source(2)))")
+}
+
+///|
 test "range and batch APIs reject unsafe or invalid input" {
   assert_true(RoaringBitmap::from_range(4, 3) is Err(InvalidRange(4, 3)))
   assert_true(

@@ -31,6 +31,36 @@ pub fn RoaringOperationLog::len(self : RoaringOperationLog) -> Int {
 }
 
 ///|
+/// True when this log is already represented solely by its checkpoint.
+pub fn RoaringOperationLog::is_compacted(self : RoaringOperationLog) -> Bool {
+  self.operations.length() == 0
+}
+
+///|
+/// Return the checkpoint without replaying pending operations.
+pub fn RoaringOperationLog::checkpoint(
+  self : RoaringOperationLog,
+) -> RoaringBitmap {
+  self.checkpoint
+}
+
+///|
+/// Discard all pending operations and restore the original checkpoint state.
+pub fn RoaringOperationLog::discard_pending(
+  self : RoaringOperationLog,
+) -> RoaringOperationLog {
+  { checkpoint: self.checkpoint, operations: [] }
+}
+
+///|
+/// Return the ordered operations as an isolated copy for audit sinks.
+pub fn RoaringOperationLog::operations(
+  self : RoaringOperationLog,
+) -> Array[BitmapOperation] {
+  self.operations.copy()
+}
+
+///|
 /// Append one operation without changing the checkpoint.
 pub fn RoaringOperationLog::append(
   self : RoaringOperationLog,
@@ -39,6 +69,30 @@ pub fn RoaringOperationLog::append(
   let operations = self.operations.copy()
   operations.push(operation)
   { checkpoint: self.checkpoint, operations }
+}
+
+///|
+/// Append a batch while preserving its declared order.
+pub fn RoaringOperationLog::append_all(
+  self : RoaringOperationLog,
+  additions : Array[BitmapOperation],
+) -> RoaringOperationLog {
+  let mut log = self
+  for operation in additions {
+    log = log.append(operation)
+  }
+  log
+}
+
+///|
+/// Compute the checkpoint-to-current patch without changing this log.
+pub fn RoaringOperationLog::pending_patch(
+  self : RoaringOperationLog,
+) -> Result[RoaringPatch, RoaringError] {
+  match self.replay() {
+    Ok(current) => Ok(self.checkpoint.diff_to(current))
+    Err(error) => Err(error)
+  }
 }
 
 ///|

@@ -2,11 +2,19 @@
 package "cauchyQ/moonbit-roaring"
 
 // Values
+pub fn decode(CodecFormat, Array[Int]) -> Result[RoaringBitmap, CodecError]
+
+pub fn decode_auto(Array[Int]) -> Result[RoaringBitmap, CodecError]
+
 pub fn decode_run_words(Array[Int]) -> Result[RoaringBitmap, CodecError]
 
 pub fn decode_words(Array[Int]) -> Result[RoaringBitmap, CodecError]
 
+pub fn detect_codec(Array[Int]) -> Result[CodecFormat, CodecError]
+
 pub fn intersection_all(Array[RoaringBitmap]) -> RoaringBitmap
+
+pub fn transcode(Array[Int], CodecFormat, CodecFormat) -> Result[Array[Int], CodecError]
 
 pub fn union_all(Array[RoaringBitmap]) -> RoaringBitmap
 
@@ -15,6 +23,31 @@ pub fn xor_all(Array[RoaringBitmap]) -> RoaringBitmap
 // Errors
 
 // Types and methods
+pub struct BitmapCatalog {
+  entries : Array[BitmapEntry]
+}
+pub fn BitmapCatalog::evaluate(Self, CatalogQuery, RoaringBitmap) -> RoaringBitmap
+pub fn BitmapCatalog::evaluate_traced(Self, CatalogQuery, RoaringBitmap) -> CatalogQueryResult
+pub fn BitmapCatalog::get(Self, Int) -> RoaringBitmap?
+pub fn BitmapCatalog::keys(Self) -> Array[Int]
+pub fn BitmapCatalog::len(Self) -> Int
+pub fn BitmapCatalog::new() -> Self
+pub fn BitmapCatalog::remove(Self, Int) -> Self
+pub fn BitmapCatalog::upsert(Self, Int, RoaringBitmap) -> Self
+
+pub(all) struct BitmapEntry {
+  key : Int
+  bitmap : RoaringBitmap
+}
+
+pub(all) struct BitmapFrame {
+  format : CodecFormat
+  payload : Array[Int]
+  checksum : Int
+}
+pub fn BitmapFrame::decode(Self) -> Result[RoaringBitmap, FrameError]
+pub fn BitmapFrame::with_payload(Self, Array[Int]) -> Self
+
 pub(all) enum BitmapOperation {
   Add(Int)
   Remove(Int)
@@ -25,12 +58,53 @@ pub(all) enum BitmapOperation {
 }
 pub fn BitmapOperation::apply(Self, RoaringBitmap) -> Result[RoaringBitmap, RoaringError]
 
+pub(all) enum BitmapPlan {
+  Source(RoaringBitmap)
+  Union(BitmapPlan, BitmapPlan)
+  Intersection(BitmapPlan, BitmapPlan)
+  Difference(BitmapPlan, BitmapPlan)
+  Xor(BitmapPlan, BitmapPlan)
+  Take(BitmapPlan, Int)
+  Drop(BitmapPlan, Int)
+}
+pub fn BitmapPlan::describe(Self) -> String
+pub fn BitmapPlan::estimated_cardinality(Self) -> Int
+pub fn BitmapPlan::evaluate(Self) -> RoaringBitmap
+pub fn BitmapPlan::stats(Self) -> BitmapPlanStats
+
+pub(all) struct BitmapPlanStats {
+  nodes : Int
+  depth : Int
+  sources : Int
+}
+
 pub(all) struct BitmapProfile {
   cardinality : Int
   minimum : Int?
   maximum : Int?
   span : Int
   block_count : Int
+}
+
+pub(all) enum CatalogQuery {
+  Key(Int)
+  Any(Array[CatalogQuery])
+  All(Array[CatalogQuery])
+  Not(CatalogQuery)
+  AtLeast(Int, Array[CatalogQuery])
+}
+pub fn CatalogQuery::referenced_keys(Self) -> Array[Int]
+pub fn CatalogQuery::stats(Self) -> CatalogQueryStats
+
+pub(all) struct CatalogQueryResult {
+  bitmap : RoaringBitmap
+  missing_keys : Array[Int]
+}
+
+pub(all) struct CatalogQueryStats {
+  nodes : Int
+  depth : Int
+  key_references : Int
 }
 
 pub(all) enum CodecError {
@@ -45,10 +119,20 @@ pub(all) enum CodecError {
   NonCanonicalPayload
 }
 
+pub(all) enum CodecFormat {
+  PlainWords
+  RunWords
+}
+
 pub(all) enum ContainerKind {
   Array
   Bitmap
   Run
+}
+
+pub(all) enum FrameError {
+  Codec(CodecError)
+  ChecksumMismatch(Int, Int)
 }
 
 pub(all) struct IntRange {
@@ -65,22 +149,31 @@ pub fn RoaringBitmap::add_range(Self, Int, Int) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::add_ranges(Self, Array[IntRange]) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::block_stats(Self) -> Array[RoaringBlockStats]
 pub fn RoaringBitmap::cardinality(Self) -> Int
+pub fn RoaringBitmap::containment_gaps(Self, Self) -> (Int, Int)
 pub fn RoaringBitmap::contains(Self, Int) -> Bool
 pub fn RoaringBitmap::contains_range(Self, Int, Int) -> Result[Bool, RoaringError]
 pub fn RoaringBitmap::count_in_range(Self, Int, Int) -> Result[Int, RoaringError]
 pub fn RoaringBitmap::cursor(Self) -> RoaringCursor
+pub fn RoaringBitmap::density_parts(Self) -> (Int, Int)
 pub fn RoaringBitmap::diff_to(Self, Self) -> RoaringPatch
 pub fn RoaringBitmap::difference(Self, Self) -> Self
+pub fn RoaringBitmap::difference_cardinality(Self, Self) -> Int
 pub fn RoaringBitmap::drop(Self, Int) -> Self
+pub fn RoaringBitmap::encode(Self, CodecFormat) -> Result[Array[Int], CodecError]
 pub fn RoaringBitmap::encode_run_words(Self) -> Result[Array[Int], CodecError]
 pub fn RoaringBitmap::encode_words(Self) -> Array[Int]
 pub fn RoaringBitmap::filter(Self, (Int) -> Bool) -> Self
+pub fn RoaringBitmap::frame(Self, CodecFormat) -> Result[BitmapFrame, CodecError]
 pub fn RoaringBitmap::from_array(Array[Int]) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::from_range(Int, Int) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::from_ranges(Array[IntRange]) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::intersection(Self, Self) -> Self
+pub fn RoaringBitmap::intersection_cardinality(Self, Self) -> Int
 pub fn RoaringBitmap::intersects(Self, Self) -> Bool
+pub fn RoaringBitmap::is_disjoint(Self, Self) -> Bool
 pub fn RoaringBitmap::is_empty(Self) -> Bool
+pub fn RoaringBitmap::is_proper_subset_of(Self, Self) -> Bool
+pub fn RoaringBitmap::is_proper_superset_of(Self, Self) -> Bool
 pub fn RoaringBitmap::is_subset_of(Self, Self) -> Bool
 pub fn RoaringBitmap::jaccard_parts(Self, Self) -> (Int, Int)
 pub fn RoaringBitmap::map_values(Self, (Int) -> Int) -> Result[Self, RoaringError]
@@ -88,24 +181,31 @@ pub fn RoaringBitmap::maximum(Self) -> Int?
 pub fn RoaringBitmap::minimum(Self) -> Int?
 pub fn RoaringBitmap::new() -> Self
 pub fn RoaringBitmap::next_at_or_after(Self, Int) -> Int?
+pub fn RoaringBitmap::overlap_coefficient_parts(Self, Self) -> (Int, Int)
+pub fn RoaringBitmap::overlap_parts(Self, Self) -> (Int, Int, Int, Int)
 pub fn RoaringBitmap::partition(Self, (Int) -> Bool) -> (Self, Self)
 pub fn RoaringBitmap::previous_at_or_before(Self, Int) -> Int?
 pub fn RoaringBitmap::profile(Self) -> BitmapProfile
 pub fn RoaringBitmap::quantile(Self, Int, Int) -> Result[Int?, RoaringError]
 pub fn RoaringBitmap::rank(Self, Int) -> Int
+pub fn RoaringBitmap::relation_to(Self, Self) -> SetRelation
 pub fn RoaringBitmap::remove(Self, Int) -> Self
 pub fn RoaringBitmap::remove_all(Self, Array[Int]) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::remove_range(Self, Int, Int) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::remove_ranges(Self, Array[IntRange]) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::sample_evenly(Self, Int) -> Array[Int]
+pub fn RoaringBitmap::sample_stride(Self, Int) -> Array[Int]
 pub fn RoaringBitmap::select(Self, Int) -> Int?
 pub fn RoaringBitmap::shift(Self, Int) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::slice_positions(Self, Int, Int) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::stats(Self) -> RoaringStats
+pub fn RoaringBitmap::symmetric_difference_cardinality(Self, Self) -> Int
 pub fn RoaringBitmap::take(Self, Int) -> Self
 pub fn RoaringBitmap::to_array(Self) -> Array[Int]
 pub fn RoaringBitmap::to_ranges(Self) -> Result[Array[IntRange], RoaringError]
 pub fn RoaringBitmap::union(Self, Self) -> Self
+pub fn RoaringBitmap::union_cardinality(Self, Self) -> Int
+pub fn RoaringBitmap::validate(Self) -> Result[Unit, ValidationError]
 pub fn RoaringBitmap::xor(Self, Self) -> Self
 
 type RoaringBlock
@@ -148,9 +248,15 @@ pub struct RoaringOperationLog {
   operations : Array[BitmapOperation]
 }
 pub fn RoaringOperationLog::append(Self, BitmapOperation) -> Self
+pub fn RoaringOperationLog::append_all(Self, Array[BitmapOperation]) -> Self
+pub fn RoaringOperationLog::checkpoint(Self) -> RoaringBitmap
 pub fn RoaringOperationLog::compact(Self) -> Result[Self, RoaringError]
+pub fn RoaringOperationLog::discard_pending(Self) -> Self
+pub fn RoaringOperationLog::is_compacted(Self) -> Bool
 pub fn RoaringOperationLog::len(Self) -> Int
 pub fn RoaringOperationLog::new(RoaringBitmap) -> Self
+pub fn RoaringOperationLog::operations(Self) -> Array[BitmapOperation]
+pub fn RoaringOperationLog::pending_patch(Self) -> Result[RoaringPatch, RoaringError]
 pub fn RoaringOperationLog::replay(Self) -> Result[RoaringBitmap, RoaringError]
 
 pub struct RoaringPatch {
@@ -170,6 +276,24 @@ pub(all) struct RoaringStats {
   bitmap_blocks : Int
   run_blocks : Int
   cardinality : Int
+}
+
+pub(all) enum SetRelation {
+  Equal
+  ProperSubset
+  ProperSuperset
+  Overlap
+  Disjoint
+}
+
+pub(all) enum ValidationError {
+  UnsortedBlockKey(Int, Int)
+  EmptyBlock(Int)
+  InvalidLowValue(Int, Int)
+  UnsortedLowValue(Int, Int, Int)
+  BitmapCardinalityMismatch(Int, Int)
+  RunCardinalityMismatch(Int, Int)
+  InvalidRun(Int, Int, Int)
 }
 
 // Type aliases
