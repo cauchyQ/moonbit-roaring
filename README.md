@@ -66,6 +66,9 @@ moon run cmd/main
   a temporary range bitmap.
 - `stats` and `block_stats` expose cardinality and selected container kinds for
   diagnostics, without exposing mutable container storage.
+- `diff_to` produces an immutable `RoaringPatch` containing additions and
+  removals. A patch can be applied, inverted, and inspected for the values it
+  touches, which supports incremental index and cache updates.
 
 The test suite includes fixed boundary tests plus a deterministic 64-case
 property corpus covering commutativity, idempotence, cancellation, and

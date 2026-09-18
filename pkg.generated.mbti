@@ -51,6 +51,7 @@ pub fn RoaringBitmap::contains(Self, Int) -> Bool
 pub fn RoaringBitmap::contains_range(Self, Int, Int) -> Result[Bool, RoaringError]
 pub fn RoaringBitmap::count_in_range(Self, Int, Int) -> Result[Int, RoaringError]
 pub fn RoaringBitmap::cursor(Self) -> RoaringCursor
+pub fn RoaringBitmap::diff_to(Self, Self) -> RoaringPatch
 pub fn RoaringBitmap::difference(Self, Self) -> Self
 pub fn RoaringBitmap::encode_run_words(Self) -> Result[Array[Int], CodecError]
 pub fn RoaringBitmap::encode_words(Self) -> Array[Int]
@@ -112,6 +113,17 @@ pub(all) enum RoaringError {
   RangeTooLarge(Int)
   RangeEndpointOverflow(Int)
 }
+
+pub struct RoaringPatch {
+  additions : RoaringBitmap
+  removals : RoaringBitmap
+}
+pub fn RoaringPatch::added_cardinality(Self) -> Int
+pub fn RoaringPatch::apply(Self, RoaringBitmap) -> RoaringBitmap
+pub fn RoaringPatch::invert(Self) -> Self
+pub fn RoaringPatch::is_empty(Self) -> Bool
+pub fn RoaringPatch::removed_cardinality(Self) -> Int
+pub fn RoaringPatch::touched(Self) -> RoaringBitmap
 
 pub(all) struct RoaringStats {
   block_count : Int

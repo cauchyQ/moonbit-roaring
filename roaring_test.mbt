@@ -140,6 +140,19 @@ test "run words are stable compact and reject malformed runs" {
 }
 
 ///|
+test "patches transform and reverse a bitmap without retaining base state" {
+  let base = RoaringBitmap::from_array([1, 2, 3, 70_000]).unwrap()
+  let target = RoaringBitmap::from_array([2, 3, 4, 80_000]).unwrap()
+  let patch = base.diff_to(target)
+  assert_eq(patch.added_cardinality(), 2)
+  assert_eq(patch.removed_cardinality(), 2)
+  assert_eq(patch.touched().to_array(), [1, 4, 70_000, 80_000])
+  assert_eq(patch.apply(base).to_array(), target.to_array())
+  assert_eq(patch.invert().apply(target).to_array(), base.to_array())
+  assert_true(base.diff_to(base).is_empty())
+}
+
+///|
 test "range and batch APIs reject unsafe or invalid input" {
   assert_true(RoaringBitmap::from_range(4, 3) is Err(InvalidRange(4, 3)))
   assert_true(
