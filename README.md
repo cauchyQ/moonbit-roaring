@@ -59,7 +59,9 @@ moon run cmd/main
   ...]`. Decoding is bounded to 1,000,000 materialized members and rejects
   overflow, overlap, and adjacent runs that would be non-canonical.
 - Union, intersection, difference, and xor merge high-16-bit blocks first and
-  dispatch matching keys to container-local operations.
+  dispatch matching keys to container-local operations. When both containers
+  are dense bitmaps, the operation runs word-wise and downshifts a sparse
+  result back to Array/Run storage.
 - Point membership, extrema, `rank`, and `select` stay at block/container
   level. `contains_range`, `next_at_or_after`, and `previous_at_or_before`
   build range and navigation queries from those primitives without allocating

@@ -25,6 +25,18 @@ test "dense blocks use bitmap storage without changing rank or select" {
 }
 
 ///|
+test "dense bitmap operations use word algebra and downshift sparse results" {
+  let left = RoaringBitmap::new().add_range(0, 5_000).unwrap()
+  let right = RoaringBitmap::new().add_range(4_000, 9_000).unwrap()
+  let overlap = left.intersection(right)
+  assert_eq(overlap.cardinality(), 1_000)
+  assert_eq(overlap.stats().bitmap_blocks, 0)
+  assert_eq(left.union(right).cardinality(), 9_000)
+  assert_eq(left.difference(right).cardinality(), 4_000)
+  assert_eq(left.xor(right).cardinality(), 8_000)
+}
+
+///|
 test "block diagnostics expose selected representations without internals" {
   let values : Array[Int] = [1]
   for value in 70_000..<70_006 {

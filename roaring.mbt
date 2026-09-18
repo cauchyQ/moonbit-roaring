@@ -29,6 +29,15 @@ priv enum Container {
 }
 
 ///|
+/// Internal word-wise operation used by the dense-container fast path.
+priv enum BitmapOperation {
+  Union
+  Intersection
+  Difference
+  Xor
+}
+
+///|
 /// Input validation failures at the non-negative integer boundary.
 pub(all) enum RoaringError {
   NegativeValue(Int)
@@ -565,27 +574,85 @@ fn Container::from_lows(lows : Array[Int]) -> Container {
 ///|
 /// Container-local union. This avoids flattening unrelated high-16-bit blocks.
 fn Container::union(self : Container, other : Container) -> Container {
-  Container::from_lows(union_sorted(self.values(), other.values()))
+  match (self, other) {
+    (BitmapContainer(left, _), BitmapContainer(right, _)) =>
+      combine_bitmap_words(left, right, BitmapOperation::Union)
+    _ => Container::from_lows(union_sorted(self.values(), other.values()))
+  }
 }
 
 ///|
 /// Container-local intersection.
 fn Container::intersection(self : Container, other : Container) -> Container {
-  Container::from_lows(intersection_sorted(self.values(), other.values()))
+  match (self, other) {
+    (BitmapContainer(left, _), BitmapContainer(right, _)) =>
+      combine_bitmap_words(left, right, BitmapOperation::Intersection)
+    _ =>
+      Container::from_lows(intersection_sorted(self.values(), other.values()))
+  }
 }
 
 ///|
 /// Container-local difference.
 fn Container::difference(self : Container, other : Container) -> Container {
-  Container::from_lows(difference_sorted(self.values(), other.values()))
+  match (self, other) {
+    (BitmapContainer(left, _), BitmapContainer(right, _)) =>
+      combine_bitmap_words(left, right, BitmapOperation::Difference)
+    _ => Container::from_lows(difference_sorted(self.values(), other.values()))
+  }
 }
 
 ///|
 /// Container-local symmetric difference.
 fn Container::xor(self : Container, other : Container) -> Container {
-  let left_only = difference_sorted(self.values(), other.values())
-  let right_only = difference_sorted(other.values(), self.values())
-  Container::from_lows(union_sorted(left_only, right_only))
+  match (self, other) {
+    (BitmapContainer(left, _), BitmapContainer(right, _)) =>
+      combine_bitmap_words(left, right, BitmapOperation::Xor)
+    _ => {
+      let left_only = difference_sorted(self.values(), other.values())
+      let right_only = difference_sorted(other.values(), self.values())
+      Container::from_lows(union_sorted(left_only, right_only))
+    }
+  }
+}
+
+///|
+/// Combine equally-sized dense words and downshift sparse results to a compact
+/// container representation.
+fn combine_bitmap_words(
+  left : Array[Int],
+  right : Array[Int],
+  operation : BitmapOperation,
+) -> Container {
+  let words : Array[Int] = []
+  let mut cardinality = 0
+  for index in 0..<word_count {
+    let word = match operation {
+      Union => left[index] | right[index]
+      Intersection => left[index] & right[index]
+      Difference => left[index] & (right[index] ^ -1)
+      Xor => left[index] ^ right[index]
+    }
+    words.push(word)
+    cardinality += count_word_bits(word)
+  }
+  if cardinality >= bitmap_threshold {
+    BitmapContainer(words, cardinality)
+  } else {
+    Container::from_lows(bitmap_words_to_lows(words))
+  }
+}
+
+///|
+/// Expand a word array only after a dense operation became sparse.
+fn bitmap_words_to_lows(words : Array[Int]) -> Array[Int] {
+  let output : Array[Int] = []
+  for low in 0..<block_size {
+    if (words[low / word_bits] & (1 << (low % word_bits))) != 0 {
+      output.push(low)
+    }
+  }
+  output
 }
 
 ///|
