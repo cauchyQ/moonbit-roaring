@@ -274,3 +274,13 @@ test "catalog query metadata preserves repeated references and nesting depth" {
   assert_eq(traced.missing_keys, [3])
   assert_eq(traced.bitmap.to_array(), [1, 2, 3])
 }
+
+///|
+test "relation helpers agree on empty sets" {
+  let empty = RoaringBitmap::new()
+  let value = RoaringBitmap::from_array([7]).unwrap()
+  assert_true(empty.relation_to(empty) is Equal)
+  assert_true(empty.relation_to(value) is ProperSubset)
+  assert_true(value.relation_to(empty) is ProperSuperset)
+  assert_eq(empty.overlap_coefficient_parts(value), (0, 0))
+}
