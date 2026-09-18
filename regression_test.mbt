@@ -283,4 +283,6 @@ test "relation helpers agree on empty sets" {
   assert_true(empty.relation_to(value) is ProperSubset)
   assert_true(value.relation_to(empty) is ProperSuperset)
   assert_eq(empty.overlap_coefficient_parts(value), (0, 0))
+  assert_true(empty.is_disjoint(value))
+  assert_eq(empty.union_cardinality(value), 1)
 }
