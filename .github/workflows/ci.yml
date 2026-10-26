@@ -10,12 +10,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install MoonBit
-        run: curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+        run: curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s -- '0.10.14+7d59c7ec9'
       - name: Add MoonBit to PATH
         run: echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
       - name: Check
         run: moon check --deny-warn
       - name: Test
         run: moon test --deny-warn
+      - name: Test release
+        run: moon test --release --deny-warn
       - name: Build release artifact
         run: moon build --release --deny-warn
+      - name: Check generated interfaces and formatting
+        run: |
+          moon info
+          moon fmt
+          git diff --exit-code

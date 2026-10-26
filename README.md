@@ -14,6 +14,14 @@ for sparse values. Roaring-style containers choose a representation per block.
 
 ## Use
 
+Add the published library to your MoonBit project:
+
+```sh
+moon add cauchyQ/moonbit-roaring@0.2.0
+```
+
+Import `"cauchyQ/moonbit-roaring" @roaring` in your `moon.pkg`.
+
 ```moonbit
 let left = @roaring.RoaringBitmap::from_array([1, 2, 3, 70_000]).unwrap()
 let right = @roaring.RoaringBitmap::from_array([2, 3, 80_000]).unwrap()
@@ -71,6 +79,34 @@ moon run cmd/main
 - `diff_to` produces an immutable `RoaringPatch` containing additions and
   removals. A patch can be applied, inverted, and inspected for the values it
   touches, which supports incremental index and cache updates.
+
+## 日志与回放：0.2.0 修复说明
+
+`RoaringOperationLog` 以检查点和有序操作记录表示集合历史。追加操作时会复制
+`AddAll`、`RemoveAll` 的整数数组；`operations()` 和 `operation_at()` 也返回
+独立副本。修改调用方数组或读取接口返回的数组，不会改变原日志、其编码或派生分支。
+
+日志允许保存尚未执行的操作。`replay()` 按顺序执行，遇到非法操作就返回错误，
+不会把部分执行结果当作完整结果。历史接口遵守同样的规则：
+
+- `replay_prefix(count)` 只执行指定前缀；有效前缀可以成功，前缀中的操作失败则返回错误。
+- `split_at(count)` 先回放前缀，成功后才建立后缀检查点；失败前缀不能被回退成旧检查点。
+- `cardinality_history()` 返回 `Result[Array[Int], JournalRangeError]`，遇到失败立即停止。
+- `OperationFailed(index, cause)` 保留相对于当前日志的零基操作位置及原始 `RoaringError`；
+  请求位置越界时仍返回 `InvalidIndex`。
+
+例如 `[Add(1), Add(-1), Add(2)]` 的前两项回放和 `split_at(2)` 都应失败。
+只回放第一项可以成功；此时拆出的后缀仍包含失败操作，不能成功完整回放。
+失败操作不会改变原日志和检查点。
+
+**从 0.1.0 迁移：** `cardinality_history()` 原先直接返回数组，现在需要处理 `Ok` / `Err`。
+对于已知有效的测试数据，可使用 `log.cardinality_history().unwrap()`；业务代码应处理
+`OperationFailed`。如果对 `JournalRangeError` 做穷尽匹配，也需要补上新增的错误分支。
+日志整数词编码的版本和标签没有改变，本次未引入新的编码格式。
+
+`journal_regression_test.mbt` 覆盖输入与输出数组隔离、分支和拆分隔离、失败位置、
+非法批次、无效前缀、历史统计和编码往返。全部测试在普通及 Release 模式下运行。
+本地及 CI 固定编译器 `v0.10.14+7d59c7ec9`。
 
 The test suite includes fixed boundary tests plus a deterministic 64-case
 property corpus covering commutativity, idempotence, cancellation, and
