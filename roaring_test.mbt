@@ -1,14 +1,16 @@
 ///|
 test "array and run containers preserve normalized values" {
-  let bitmap = RoaringBitmap::from_array([7, 2, 3, 4, 4, 70_000]).unwrap()
+  let bitmap = @moonbit-roaring.RoaringBitmap::from_array([
+    7, 2, 3, 4, 4, 70_000,
+  ]).unwrap()
   assert_eq(bitmap.to_array(), [2, 3, 4, 7, 70_000])
   assert_eq(bitmap.cardinality(), 5)
 }
 
 ///|
 test "set algebra matches integer-set semantics" {
-  let left = RoaringBitmap::from_array([1, 2, 3, 70_000]).unwrap()
-  let right = RoaringBitmap::from_array([3, 4, 70_000, 80_000]).unwrap()
+  let left = @moonbit-roaring.RoaringBitmap::from_array([1, 2, 3, 70_000]).unwrap()
+  let right = @moonbit-roaring.RoaringBitmap::from_array([3, 4, 70_000, 80_000]).unwrap()
   assert_eq(left.union(right).to_array(), [1, 2, 3, 4, 70_000, 80_000])
   assert_eq(left.intersection(right).to_array(), [3, 70_000])
   assert_eq(left.difference(right).to_array(), [1, 2])
@@ -17,7 +19,9 @@ test "set algebra matches integer-set semantics" {
 
 ///|
 test "dense blocks use bitmap storage without changing rank or select" {
-  let bitmap = RoaringBitmap::new().add_range(0, 5_000).unwrap()
+  let bitmap = @moonbit-roaring.RoaringBitmap::new()
+    .add_range(0, 5_000)
+    .unwrap()
   assert_eq(bitmap.cardinality(), 5_000)
   assert_eq(bitmap.rank(37), 38)
   assert_eq(bitmap.select(4_999), Some(4_999))
@@ -26,8 +30,10 @@ test "dense blocks use bitmap storage without changing rank or select" {
 
 ///|
 test "dense bitmap operations use word algebra and downshift sparse results" {
-  let left = RoaringBitmap::new().add_range(0, 5_000).unwrap()
-  let right = RoaringBitmap::new().add_range(4_000, 9_000).unwrap()
+  let left = @moonbit-roaring.RoaringBitmap::new().add_range(0, 5_000).unwrap()
+  let right = @moonbit-roaring.RoaringBitmap::new()
+    .add_range(4_000, 9_000)
+    .unwrap()
   let overlap = left.intersection(right)
   assert_eq(overlap.cardinality(), 1_000)
   assert_eq(overlap.stats().bitmap_blocks, 0)
@@ -45,7 +51,9 @@ test "block diagnostics expose selected representations without internals" {
   for value in 131_072..<136_072 {
     values.push(value)
   }
-  let blocks = RoaringBitmap::from_array(values).unwrap().block_stats()
+  let blocks = @moonbit-roaring.RoaringBitmap::from_array(values)
+    .unwrap()
+    .block_stats()
   assert_eq(blocks.length(), 3)
   assert_eq(blocks[0].key, 0)
   assert_true(blocks[0].kind is Array)
@@ -56,16 +64,18 @@ test "block diagnostics expose selected representations without internals" {
 
 ///|
 test "non-negative boundary and removal are checked" {
-  let bitmap = RoaringBitmap::new().add(2_147_483_647).unwrap()
+  let bitmap = @moonbit-roaring.RoaringBitmap::new().add(2_147_483_647).unwrap()
   assert_true(bitmap.contains(2_147_483_647))
   assert_eq(bitmap.remove(2_147_483_647).cardinality(), 0)
-  assert_true(RoaringBitmap::new().add(-1) is Err(NegativeValue(-1)))
+  assert_true(
+    @moonbit-roaring.RoaringBitmap::new().add(-1) is Err(NegativeValue(-1)),
+  )
 }
 
 ///|
 test "metadata and relational queries preserve set semantics" {
-  let sparse = RoaringBitmap::from_array([4, 7, 9]).unwrap()
-  let dense = RoaringBitmap::new().add_range(0, 5_000).unwrap()
+  let sparse = @moonbit-roaring.RoaringBitmap::from_array([4, 7, 9]).unwrap()
+  let dense = @moonbit-roaring.RoaringBitmap::new().add_range(0, 5_000).unwrap()
   assert_eq(sparse.minimum(), Some(4))
   assert_eq(sparse.maximum(), Some(9))
   assert_true(sparse.intersects(dense))
@@ -75,7 +85,9 @@ test "metadata and relational queries preserve set semantics" {
 
 ///|
 test "container-aware point and range queries cross block boundaries" {
-  let bitmap = RoaringBitmap::from_array([1, 2, 3, 65_535, 65_536, 65_538]).unwrap()
+  let bitmap = @moonbit-roaring.RoaringBitmap::from_array([
+    1, 2, 3, 65_535, 65_536, 65_538,
+  ]).unwrap()
   assert_true(bitmap.contains(65_536))
   assert_true(!bitmap.contains(65_537))
   assert_eq(bitmap.rank(65_535), 4)
@@ -90,7 +102,10 @@ test "container-aware point and range queries cross block boundaries" {
 
 ///|
 test "batch range cursor and codec APIs are deterministic" {
-  let bitmap = RoaringBitmap::from_range(2, 6).unwrap().add_all([8, 9]).unwrap()
+  let bitmap = @moonbit-roaring.RoaringBitmap::from_range(2, 6)
+    .unwrap()
+    .add_all([8, 9])
+    .unwrap()
   let trimmed = bitmap.remove_range(3, 5).unwrap().remove_all([9]).unwrap()
   assert_eq(trimmed.to_array(), [2, 5, 8])
   assert_true(trimmed.count_in_range(2, 8) is Ok(2))
@@ -102,59 +117,79 @@ test "batch range cursor and codec APIs are deterministic" {
   assert_eq(second, Some(5))
   assert_eq(third, Some(8))
   assert_eq(cursor.remaining(), 0)
-  assert_eq(decode_words(trimmed.encode_words()).unwrap().to_array(), [2, 5, 8])
+  assert_eq(
+    @moonbit-roaring.decode_words(trimmed.encode_words()).unwrap().to_array(),
+    [2, 5, 8],
+  )
 }
 
 ///|
 test "bulk aggregation uses the documented empty identities" {
-  let first = RoaringBitmap::from_array([1, 2, 4, 70_000]).unwrap()
-  let second = RoaringBitmap::from_array([2, 3, 4, 80_000]).unwrap()
-  let third = RoaringBitmap::from_array([2, 4, 5]).unwrap()
-  assert_eq(union_all([first, second, third]).to_array(), [
+  let first = @moonbit-roaring.RoaringBitmap::from_array([1, 2, 4, 70_000]).unwrap()
+  let second = @moonbit-roaring.RoaringBitmap::from_array([2, 3, 4, 80_000]).unwrap()
+  let third = @moonbit-roaring.RoaringBitmap::from_array([2, 4, 5]).unwrap()
+  assert_eq(@moonbit-roaring.union_all([first, second, third]).to_array(), [
     1, 2, 3, 4, 5, 70_000, 80_000,
   ])
-  assert_eq(intersection_all([first, second, third]).to_array(), [2, 4])
-  assert_eq(xor_all([first, second, third]).to_array(), [
+  assert_eq(
+    @moonbit-roaring.intersection_all([first, second, third]).to_array(),
+    [2, 4],
+  )
+  assert_eq(@moonbit-roaring.xor_all([first, second, third]).to_array(), [
     1, 2, 3, 4, 5, 70_000, 80_000,
   ])
-  assert_true(union_all([]).is_empty())
-  assert_true(intersection_all([]).is_empty())
+  assert_true(@moonbit-roaring.union_all([]).is_empty())
+  assert_true(@moonbit-roaring.intersection_all([]).is_empty())
 }
 
 ///|
 test "codec rejects invalid version count and noncanonical input" {
-  assert_true(decode_words([]) is Err(MissingHeader))
-  assert_true(decode_words([2, 0]) is Err(UnsupportedVersion(2)))
-  assert_true(decode_words([1, 2, 7]) is Err(InvalidPayloadLength(2, 1)))
-  assert_true(decode_words([1, 2, 7, 7]) is Err(NonCanonicalPayload))
+  assert_true(@moonbit-roaring.decode_words([]) is Err(MissingHeader))
+  assert_true(
+    @moonbit-roaring.decode_words([2, 0]) is Err(UnsupportedVersion(2)),
+  )
+  assert_true(
+    @moonbit-roaring.decode_words([1, 2, 7]) is Err(InvalidPayloadLength(2, 1)),
+  )
+  assert_true(
+    @moonbit-roaring.decode_words([1, 2, 7, 7]) is Err(NonCanonicalPayload),
+  )
 }
 
 ///|
 test "run words are stable compact and reject malformed runs" {
-  let bitmap = RoaringBitmap::from_ranges([
-    { start: 2, end: 8 },
-    { start: 70_000, end: 70_004 },
+  let bitmap = @moonbit-roaring.RoaringBitmap::from_ranges([
+    { start: 2, end: 8, },
+    { start: 70_000, end: 70_004, },
   ]).unwrap()
   let words = bitmap.encode_run_words().unwrap()
   assert_eq(words, [3, 10, 2, 2, 6, 70_000, 4])
-  assert_eq(decode_run_words(words).unwrap().to_array(), bitmap.to_array())
-  assert_true(decode_run_words([3, 1, 1, 2, 0]) is Err(InvalidRunLength(0)))
-  assert_true(
-    decode_run_words([3, 2, 1, 2, 1]) is Err(CardinalityMismatch(2, 1)),
+  assert_eq(
+    @moonbit-roaring.decode_run_words(words).unwrap().to_array(),
+    bitmap.to_array(),
   )
   assert_true(
-    decode_run_words([3, 2, 2, 2, 1, 3, 1]) is Err(NonCanonicalPayload),
+    @moonbit-roaring.decode_run_words([3, 1, 1, 2, 0])
+    is Err(InvalidRunLength(0)),
   )
   assert_true(
-    decode_run_words([3, 1_000_001, 1, 0, 1_000_001])
+    @moonbit-roaring.decode_run_words([3, 2, 1, 2, 1])
+    is Err(CardinalityMismatch(2, 1)),
+  )
+  assert_true(
+    @moonbit-roaring.decode_run_words([3, 2, 2, 2, 1, 3, 1])
+    is Err(NonCanonicalPayload),
+  )
+  assert_true(
+    @moonbit-roaring.decode_run_words([3, 1_000_001, 1, 0, 1_000_001])
     is Err(PayloadTooLarge(1_000_001)),
   )
 }
 
 ///|
 test "patches transform and reverse a bitmap without retaining base state" {
-  let base = RoaringBitmap::from_array([1, 2, 3, 70_000]).unwrap()
-  let target = RoaringBitmap::from_array([2, 3, 4, 80_000]).unwrap()
+  let base = @moonbit-roaring.RoaringBitmap::from_array([1, 2, 3, 70_000]).unwrap()
+  let target = @moonbit-roaring.RoaringBitmap::from_array([2, 3, 4, 80_000]).unwrap()
   let patch = base.diff_to(target)
   assert_eq(patch.added_cardinality(), 2)
   assert_eq(patch.removed_cardinality(), 2)
@@ -166,7 +201,7 @@ test "patches transform and reverse a bitmap without retaining base state" {
 
 ///|
 test "transforms preserve normalization and enforce integer boundaries" {
-  let bitmap = RoaringBitmap::from_array([1, 2, 3, 4, 8]).unwrap()
+  let bitmap = @moonbit-roaring.RoaringBitmap::from_array([1, 2, 3, 4, 8]).unwrap()
   assert_eq(bitmap.filter(value => value % 2 == 0).to_array(), [2, 4, 8])
   assert_eq(bitmap.map_values(value => value / 2).unwrap().to_array(), [
     0, 1, 2, 4,
@@ -183,8 +218,8 @@ test "transforms preserve normalization and enforce integer boundaries" {
 
 ///|
 test "operation log replays in order and compacts only after success" {
-  let base = RoaringBitmap::from_array([1, 4]).unwrap()
-  let log = RoaringOperationLog::new(base)
+  let base = @moonbit-roaring.RoaringBitmap::from_array([1, 4]).unwrap()
+  let log = @moonbit-roaring.RoaringOperationLog::new(base)
     .append(Add(2))
     .append(AddRange(5, 8))
     .append(Remove(4))
@@ -200,7 +235,7 @@ test "operation log replays in order and compacts only after success" {
 
 ///|
 test "analytics exposes exact ratios and stable positional samples" {
-  let bitmap = RoaringBitmap::from_array([2, 4, 8, 16, 32]).unwrap()
+  let bitmap = @moonbit-roaring.RoaringBitmap::from_array([2, 4, 8, 16, 32]).unwrap()
   let profile = bitmap.profile()
   assert_eq(profile.cardinality, 5)
   assert_eq(profile.minimum, Some(2))
@@ -210,16 +245,16 @@ test "analytics exposes exact ratios and stable positional samples" {
   assert_eq(bitmap.sample_evenly(99), [2, 4, 8, 16, 32])
   assert_true(bitmap.quantile(1, 2) is Ok(Some(8)))
   assert_true(bitmap.quantile(2, 1) is Err(InvalidRange(2, 1)))
-  let other = RoaringBitmap::from_array([4, 8, 64]).unwrap()
+  let other = @moonbit-roaring.RoaringBitmap::from_array([4, 8, 64]).unwrap()
   assert_eq(bitmap.jaccard_parts(other), (2, 6))
 }
 
 ///|
 test "relations classify containment overlap and exact cardinality metrics" {
-  let a = RoaringBitmap::from_array([1, 2, 3]).unwrap()
-  let b = RoaringBitmap::from_array([2, 3, 4]).unwrap()
-  let c = RoaringBitmap::from_array([1, 2, 3, 4]).unwrap()
-  let d = RoaringBitmap::from_array([9]).unwrap()
+  let a = @moonbit-roaring.RoaringBitmap::from_array([1, 2, 3]).unwrap()
+  let b = @moonbit-roaring.RoaringBitmap::from_array([2, 3, 4]).unwrap()
+  let c = @moonbit-roaring.RoaringBitmap::from_array([1, 2, 3, 4]).unwrap()
+  let d = @moonbit-roaring.RoaringBitmap::from_array([9]).unwrap()
   assert_true(a.relation_to(a) is Equal)
   assert_true(a.relation_to(c) is ProperSubset)
   assert_true(c.relation_to(a) is ProperSuperset)
@@ -238,10 +273,10 @@ test "relations classify containment overlap and exact cardinality metrics" {
 
 ///|
 test "catalog queries and plans compose set algebra" {
-  let universe = RoaringBitmap::from_array([1, 2, 3, 4, 5]).unwrap()
-  let catalog = BitmapCatalog::new()
-    .upsert(1, RoaringBitmap::from_array([1, 2, 3]).unwrap())
-    .upsert(2, RoaringBitmap::from_array([2, 3, 4]).unwrap())
+  let universe = @moonbit-roaring.RoaringBitmap::from_array([1, 2, 3, 4, 5]).unwrap()
+  let catalog = @moonbit-roaring.BitmapCatalog::new()
+    .upsert(1, @moonbit-roaring.RoaringBitmap::from_array([1, 2, 3]).unwrap())
+    .upsert(2, @moonbit-roaring.RoaringBitmap::from_array([2, 3, 4]).unwrap())
   assert_eq(catalog.evaluate(All([Key(1), Not(Key(2))]), universe).to_array(), [
     1,
   ])
@@ -249,10 +284,10 @@ test "catalog queries and plans compose set algebra" {
     catalog.evaluate(AtLeast(2, [Key(1), Key(2)]), universe).to_array(),
     [2, 3],
   )
-  let plan = BitmapPlan::Take(
-    BitmapPlan::Union(
-      BitmapPlan::Source(catalog.get(1).unwrap()),
-      BitmapPlan::Source(catalog.get(2).unwrap()),
+  let plan = @moonbit-roaring.BitmapPlan::Take(
+    @moonbit-roaring.BitmapPlan::Union(
+      @moonbit-roaring.BitmapPlan::Source(catalog.get(1).unwrap()),
+      @moonbit-roaring.BitmapPlan::Source(catalog.get(2).unwrap()),
     ),
     3,
   )
@@ -261,19 +296,22 @@ test "catalog queries and plans compose set algebra" {
 
 ///|
 test "codec dispatch transcodes and preserves malformed input errors" {
-  let bitmap = RoaringBitmap::from_range(10, 20).unwrap()
+  let bitmap = @moonbit-roaring.RoaringBitmap::from_range(10, 20).unwrap()
   let runs = bitmap.encode(RunWords).unwrap()
-  let plain = transcode(runs, RunWords, PlainWords).unwrap()
-  assert_eq(decode(PlainWords, plain).unwrap().to_array(), bitmap.to_array())
+  let plain = @moonbit-roaring.transcode(runs, RunWords, PlainWords).unwrap()
+  assert_eq(
+    @moonbit-roaring.decode(PlainWords, plain).unwrap().to_array(),
+    bitmap.to_array(),
+  )
   assert_true(
-    transcode([1, 2, 7], PlainWords, RunWords)
+    @moonbit-roaring.transcode([1, 2, 7], PlainWords, RunWords)
     is Err(InvalidPayloadLength(2, 1)),
   )
 }
 
 ///|
 test "validation and frames protect structural and transport boundaries" {
-  let bitmap = RoaringBitmap::from_array([1, 2, 3, 70_000]).unwrap()
+  let bitmap = @moonbit-roaring.RoaringBitmap::from_array([1, 2, 3, 70_000]).unwrap()
   assert_true(bitmap.validate() is Ok(_))
   let frame = bitmap.frame(RunWords).unwrap()
   assert_eq(frame.decode().unwrap().to_array(), bitmap.to_array())
@@ -284,10 +322,14 @@ test "validation and frames protect structural and transport boundaries" {
 
 ///|
 test "plan static stats do not require execution" {
-  let plan = BitmapPlan::Union(
-    BitmapPlan::Source(RoaringBitmap::from_array([1, 2]).unwrap()),
-    BitmapPlan::Take(
-      BitmapPlan::Source(RoaringBitmap::from_array([2, 3]).unwrap()),
+  let plan = @moonbit-roaring.BitmapPlan::Union(
+    @moonbit-roaring.BitmapPlan::Source(
+      @moonbit-roaring.RoaringBitmap::from_array([1, 2]).unwrap(),
+    ),
+    @moonbit-roaring.BitmapPlan::Take(
+      @moonbit-roaring.BitmapPlan::Source(
+        @moonbit-roaring.RoaringBitmap::from_array([2, 3]).unwrap(),
+      ),
       1,
     ),
   )
@@ -300,13 +342,16 @@ test "plan static stats do not require execution" {
 
 ///|
 test "range and batch APIs reject unsafe or invalid input" {
-  assert_true(RoaringBitmap::from_range(4, 3) is Err(InvalidRange(4, 3)))
   assert_true(
-    RoaringBitmap::from_range(0, 1_000_001) is Err(RangeTooLarge(1_000_001)),
+    @moonbit-roaring.RoaringBitmap::from_range(4, 3) is Err(InvalidRange(4, 3)),
   )
-  let bitmap = RoaringBitmap::from_array([2, 4]).unwrap()
+  assert_true(
+    @moonbit-roaring.RoaringBitmap::from_range(0, 1_000_001)
+    is Err(RangeTooLarge(1_000_001)),
+  )
+  let bitmap = @moonbit-roaring.RoaringBitmap::from_array([2, 4]).unwrap()
   assert_true(bitmap.remove_all([4, -1]) is Err(NegativeValue(-1)))
-  let cleared = RoaringBitmap::from_array([2, 700_000])
+  let cleared = @moonbit-roaring.RoaringBitmap::from_array([2, 700_000])
     .unwrap()
     .remove_range(0, 1_500_000)
     .unwrap()
@@ -315,10 +360,10 @@ test "range and batch APIs reject unsafe or invalid input" {
 
 ///|
 test "batch range construction normalizes overlaps and protects total size" {
-  let bitmap = RoaringBitmap::from_ranges([
-    { start: 2, end: 5 },
-    { start: 4, end: 8 },
-    { start: 10, end: 12 },
+  let bitmap = @moonbit-roaring.RoaringBitmap::from_ranges([
+    { start: 2, end: 5, },
+    { start: 4, end: 8, },
+    { start: 10, end: 12, },
   ]).unwrap()
   assert_eq(bitmap.to_array(), [2, 3, 4, 5, 6, 7, 10, 11])
   let ranges = bitmap.to_ranges().unwrap()
@@ -327,29 +372,32 @@ test "batch range construction normalizes overlaps and protects total size" {
   assert_eq(ranges[0].end, 8)
   assert_eq(ranges[1].start, 10)
   assert_eq(ranges[1].end, 12)
-  assert_eq(bitmap.remove_ranges([{ start: 3, end: 11 }]).unwrap().to_array(), [
-    2, 11,
-  ])
+  assert_eq(
+    bitmap.remove_ranges([{ start: 3, end: 11, }]).unwrap().to_array(),
+    [2, 11],
+  )
   assert_true(
-    RoaringBitmap::from_ranges([{ start: -1, end: 2 }])
+    @moonbit-roaring.RoaringBitmap::from_ranges([{ start: -1, end: 2, }])
     is Err(InvalidRange(-1, 2)),
   )
   assert_true(
-    RoaringBitmap::from_ranges([
-      { start: 0, end: 600_000 },
-      { start: 700_000, end: 1_300_001 },
+    @moonbit-roaring.RoaringBitmap::from_ranges([
+      { start: 0, end: 600_000, },
+      { start: 700_000, end: 1_300_001, },
     ])
     is Err(RangeTooLarge(1_200_001)),
   )
   assert_true(
-    RoaringBitmap::from_array([2_147_483_647]).unwrap().to_ranges()
+    @moonbit-roaring.RoaringBitmap::from_array([2_147_483_647])
+    .unwrap()
+    .to_ranges()
     is Err(RangeEndpointOverflow(2_147_483_647)),
   )
 }
 
 ///|
 test "builder stages atomically and normalizes exactly once at finish" {
-  let builder = RoaringBuilder::new()
+  let builder = @moonbit-roaring.RoaringBuilder::new()
   assert_true(builder.push_all([7, 2, 2]) is Ok(_))
   assert_true(builder.push_range(3, 6) is Ok(_))
   assert_eq(builder.staged_len(), 6)
@@ -367,8 +415,8 @@ test "deterministic property corpus preserves set laws and codec round trips" {
       left_values.push((seed * 997 + index * 7_919) % 140_000)
       right_values.push((seed * 1_309 + index * 6_151 + 23) % 140_000)
     }
-    let left = RoaringBitmap::from_array(left_values).unwrap()
-    let right = RoaringBitmap::from_array(right_values).unwrap()
+    let left = @moonbit-roaring.RoaringBitmap::from_array(left_values).unwrap()
+    let right = @moonbit-roaring.RoaringBitmap::from_array(right_values).unwrap()
     assert_eq(left.union(right).to_array(), right.union(left).to_array())
     assert_eq(
       left.intersection(right).to_array(),
@@ -381,7 +429,7 @@ test "deterministic property corpus preserves set laws and codec round trips" {
       left.difference(left.difference(right)).to_array(),
     )
     assert_eq(
-      decode_words(left.encode_words()).unwrap().to_array(),
+      @moonbit-roaring.decode_words(left.encode_words()).unwrap().to_array(),
       left.to_array(),
     )
   }

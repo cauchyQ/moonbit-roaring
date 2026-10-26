@@ -40,10 +40,14 @@ pub(all) struct BitmapPlanStats {
 /// Count nodes, depth, and source leaves without materializing a bitmap.
 pub fn BitmapPlan::stats(self : BitmapPlan) -> BitmapPlanStats {
   match self {
-    Source(_) => { nodes: 1, depth: 1, sources: 1 }
+    Source(_) => { nodes: 1, depth: 1, sources: 1, }
     Take(input, _) | Drop(input, _) => {
       let child = input.stats()
-      { nodes: child.nodes + 1, depth: child.depth + 1, sources: child.sources }
+      {
+        nodes: child.nodes + 1,
+        depth: child.depth + 1,
+        sources: child.sources,
+      }
     }
     Union(left, right)
     | Intersection(left, right)

@@ -40,7 +40,7 @@ fn oracle_rank(values : Array[Int], value : Int) -> Int {
 test "generated membership rank select and codec cases remain consistent" {
   for seed in 0..<64 {
     let raw = generated_values(seed, 337, 997)
-    let bitmap = RoaringBitmap::from_array(raw).unwrap()
+    let bitmap = @moonbit-roaring.RoaringBitmap::from_array(raw).unwrap()
     let oracle = normalized_oracle(raw)
     assert_eq(bitmap.to_array(), oracle)
     assert_eq(bitmap.cardinality(), oracle.length())
@@ -54,8 +54,11 @@ test "generated membership rank select and codec cases remain consistent" {
     assert_eq(bitmap.select(oracle.length()), None)
     let plain = bitmap.encode_words()
     let run = bitmap.encode_run_words().unwrap()
-    assert_eq(decode_words(plain).unwrap().to_array(), oracle)
-    assert_eq(decode_run_words(run).unwrap().to_array(), oracle)
+    assert_eq(@moonbit-roaring.decode_words(plain).unwrap().to_array(), oracle)
+    assert_eq(
+      @moonbit-roaring.decode_run_words(run).unwrap().to_array(),
+      oracle,
+    )
   }
 }
 
@@ -64,8 +67,8 @@ test "generated algebra agrees with explicit value membership oracle" {
   for seed in 0..<64 {
     let left_raw = generated_values(seed, 149, 613)
     let right_raw = generated_values(seed + 17, 271, 431)
-    let left = RoaringBitmap::from_array(left_raw).unwrap()
-    let right = RoaringBitmap::from_array(right_raw).unwrap()
+    let left = @moonbit-roaring.RoaringBitmap::from_array(left_raw).unwrap()
+    let right = @moonbit-roaring.RoaringBitmap::from_array(right_raw).unwrap()
     let left_values = normalized_oracle(left_raw)
     let right_values = normalized_oracle(right_raw)
     let union_expected : Array[Int] = []
@@ -101,16 +104,21 @@ test "generated algebra agrees with explicit value membership oracle" {
 
 ///|
 test "generated malformed codecs and journals fail without producing state" {
-  let checkpoint = RoaringBitmap::from_array([1, 2, 3]).unwrap()
+  let checkpoint = @moonbit-roaring.RoaringBitmap::from_array([1, 2, 3]).unwrap()
   for tag in -2..<12 {
     if tag != 1 && tag != 3 {
-      assert_true(decode_auto([tag, 0]) is Err(_))
+      assert_true(@moonbit-roaring.decode_auto([tag, 0]) is Err(_))
     }
     if tag < 1 || tag > 6 {
-      assert_true(decode_operation_log(checkpoint, [1, 1, tag]) is Err(_))
+      assert_true(
+        @moonbit-roaring.decode_operation_log(checkpoint, [1, 1, tag]) is Err(_),
+      )
     }
   }
   for count in -3..<0 {
-    assert_true(decode_operation_log(checkpoint, [1, 1, 5, count]) is Err(_))
+    assert_true(
+      @moonbit-roaring.decode_operation_log(checkpoint, [1, 1, 5, count])
+      is Err(_),
+    )
   }
 }

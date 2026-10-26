@@ -192,6 +192,7 @@ pub(all) enum JournalCodecError {
 
 pub(all) enum JournalRangeError {
   InvalidIndex(Int, Int)
+  OperationFailed(Int, RoaringError)
 }
 
 pub(all) struct QueryExecutionTrace {
@@ -313,7 +314,7 @@ pub struct RoaringOperationLog {
 }
 pub fn RoaringOperationLog::append(Self, BitmapOperation) -> Self
 pub fn RoaringOperationLog::append_all(Self, Array[BitmapOperation]) -> Self
-pub fn RoaringOperationLog::cardinality_history(Self) -> Array[Int]
+pub fn RoaringOperationLog::cardinality_history(Self) -> Result[Array[Int], JournalRangeError]
 pub fn RoaringOperationLog::checkpoint(Self) -> RoaringBitmap
 pub fn RoaringOperationLog::checkpoint_frame(Self, CodecFormat) -> Result[BitmapFrame, RoaringError]
 pub fn RoaringOperationLog::compact(Self) -> Result[Self, RoaringError]
@@ -406,4 +407,3 @@ pub(all) enum ValidationError {
 // Type aliases
 
 // Traits
-

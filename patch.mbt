@@ -11,7 +11,7 @@ pub fn RoaringBitmap::diff_to(
   self : RoaringBitmap,
   target : RoaringBitmap,
 ) -> RoaringPatch {
-  { additions: target.difference(self), removals: self.difference(target) }
+  { additions: target.difference(self), removals: self.difference(target), }
 }
 
 ///|
@@ -26,7 +26,7 @@ pub fn RoaringPatch::apply(
 ///|
 /// Return a patch that reverses this patch when applied to its target state.
 pub fn RoaringPatch::invert(self : RoaringPatch) -> RoaringPatch {
-  { additions: self.removals, removals: self.additions }
+  { additions: self.removals, removals: self.additions, }
 }
 
 ///|

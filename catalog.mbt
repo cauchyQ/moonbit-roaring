@@ -23,7 +23,7 @@ pub(all) enum CatalogQuery {
 
 ///|
 pub fn BitmapCatalog::new() -> BitmapCatalog {
-  { entries: [] }
+  { entries: [], }
 }
 
 ///|
@@ -46,14 +46,14 @@ pub fn BitmapCatalog::upsert(
   let mut replaced = false
   for entry in self.entries {
     if entry.key == key {
-      entries.push({ key, bitmap })
+      entries.push({ key, bitmap, })
       replaced = true
     } else {
       entries.push(entry)
     }
   }
   if !replaced {
-    entries.push({ key, bitmap })
+    entries.push({ key, bitmap, })
     entries.sort_by((a, b) => a.key.compare(b.key))
   }
   { entries, }
@@ -61,7 +61,7 @@ pub fn BitmapCatalog::upsert(
 
 ///|
 pub fn BitmapCatalog::remove(self : BitmapCatalog, key : Int) -> BitmapCatalog {
-  { entries: self.entries.filter(entry => entry.key != key) }
+  { entries: self.entries.filter(entry => entry.key != key), }
 }
 
 ///|
@@ -92,7 +92,7 @@ pub(all) struct CatalogQueryStats {
 /// Inspect the structural shape of a catalog query.
 pub fn CatalogQuery::stats(self : CatalogQuery) -> CatalogQueryStats {
   match self {
-    Key(_) => { nodes: 1, depth: 1, key_references: 1 }
+    Key(_) => { nodes: 1, depth: 1, key_references: 1, }
     Not(child) => {
       let stats = child.stats()
       {
@@ -113,7 +113,7 @@ pub fn CatalogQuery::stats(self : CatalogQuery) -> CatalogQueryStats {
           depth = stats.depth + 1
         }
       }
-      { nodes, depth, key_references: refs }
+      { nodes, depth, key_references: refs, }
     }
   }
 }
@@ -156,7 +156,7 @@ pub fn BitmapCatalog::evaluate_traced(
       missing.push(key)
     }
   }
-  { bitmap: self.evaluate(query, universe), missing_keys: missing }
+  { bitmap: self.evaluate(query, universe), missing_keys: missing, }
 }
 
 ///|

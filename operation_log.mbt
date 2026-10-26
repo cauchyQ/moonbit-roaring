@@ -10,6 +10,16 @@ pub(all) enum BitmapOperation {
 }
 
 ///|
+/// Detach mutable batch payloads at the log's input and output boundaries.
+fn BitmapOperation::owned_copy(self : BitmapOperation) -> BitmapOperation {
+  match self {
+    AddAll(values) => AddAll(values.copy())
+    RemoveAll(values) => RemoveAll(values.copy())
+    _ => self
+  }
+}
+
+///|
 /// A checkpoint plus ordered operations that have not yet been compacted.
 pub struct RoaringOperationLog {
   checkpoint : RoaringBitmap
@@ -21,7 +31,7 @@ pub struct RoaringOperationLog {
 pub fn RoaringOperationLog::new(
   checkpoint : RoaringBitmap,
 ) -> RoaringOperationLog {
-  { checkpoint, operations: [] }
+  { checkpoint, operations: [], }
 }
 
 ///|
@@ -49,7 +59,7 @@ pub fn RoaringOperationLog::checkpoint(
 pub fn RoaringOperationLog::discard_pending(
   self : RoaringOperationLog,
 ) -> RoaringOperationLog {
-  { checkpoint: self.checkpoint, operations: [] }
+  { checkpoint: self.checkpoint, operations: [], }
 }
 
 ///|
@@ -57,18 +67,18 @@ pub fn RoaringOperationLog::discard_pending(
 pub fn RoaringOperationLog::operations(
   self : RoaringOperationLog,
 ) -> Array[BitmapOperation] {
-  self.operations.copy()
+  self.operations.map(operation => operation.owned_copy())
 }
 
 ///|
-/// Append one operation without changing the checkpoint.
+/// Append one operation, copying batch values without changing the checkpoint.
 pub fn RoaringOperationLog::append(
   self : RoaringOperationLog,
   operation : BitmapOperation,
 ) -> RoaringOperationLog {
   let operations = self.operations.copy()
-  operations.push(operation)
-  { checkpoint: self.checkpoint, operations }
+  operations.push(operation.owned_copy())
+  { checkpoint: self.checkpoint, operations, }
 }
 
 ///|
@@ -116,7 +126,7 @@ pub fn RoaringOperationLog::compact(
   self : RoaringOperationLog,
 ) -> Result[RoaringOperationLog, RoaringError] {
   match self.replay() {
-    Ok(checkpoint) => Ok({ checkpoint, operations: [] })
+    Ok(checkpoint) => Ok({ checkpoint, operations: [], })
     Err(error) => Err(error)
   }
 }

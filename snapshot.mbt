@@ -33,7 +33,7 @@ pub(all) struct SnapshotPatchEnvelope {
 ///|
 /// Create generation zero from a bitmap.
 pub fn RoaringSnapshot::new(bitmap : RoaringBitmap) -> RoaringSnapshot {
-  { generation: 0, bitmap }
+  { generation: 0, bitmap, }
 }
 
 ///|
@@ -45,7 +45,7 @@ pub fn RoaringSnapshot::at(
   if generation < 0 {
     Err(InvalidGeneration(generation))
   } else {
-    Ok({ generation, bitmap })
+    Ok({ generation, bitmap, })
   }
 }
 
@@ -70,7 +70,7 @@ pub fn RoaringSnapshot::advance(
   if self.generation == 2_147_483_647 {
     return Err(GenerationOverflow(self.generation))
   }
-  Ok({ generation: self.generation + 1, bitmap: patch.apply(self.bitmap) })
+  Ok({ generation: self.generation + 1, bitmap: patch.apply(self.bitmap), })
 }
 
 ///|
@@ -89,7 +89,7 @@ pub fn RoaringSnapshot::envelope(
   format : CodecFormat,
 ) -> Result[SnapshotEnvelope, CodecError] {
   match self.bitmap.frame(format) {
-    Ok(frame) => Ok({ generation: self.generation, frame })
+    Ok(frame) => Ok({ generation: self.generation, frame, })
     Err(error) => Err(error)
   }
 }
@@ -103,7 +103,7 @@ pub fn SnapshotEnvelope::decode(
     return Err(InvalidGeneration(self.generation))
   }
   match self.frame.decode() {
-    Ok(bitmap) => Ok({ generation: self.generation, bitmap })
+    Ok(bitmap) => Ok({ generation: self.generation, bitmap, })
     Err(error) => Err(Frame(error))
   }
 }

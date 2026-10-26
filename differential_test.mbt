@@ -37,8 +37,8 @@ test "generated differential corpus agrees with array oracle" {
       left.push((seed * 109 + index * 673) % 140_000)
       right.push((seed * 251 + index * 431 + 11) % 140_000)
     }
-    let a = RoaringBitmap::from_array(left).unwrap()
-    let b = RoaringBitmap::from_array(right).unwrap()
+    let a = @moonbit-roaring.RoaringBitmap::from_array(left).unwrap()
+    let b = @moonbit-roaring.RoaringBitmap::from_array(right).unwrap()
     assert_eq(a.union(b).to_array(), oracle_union_values(left, right))
     assert_eq(a.intersection(b).to_array(), oracle_common_values(left, right))
     assert_eq(a.difference(b).to_array(), oracle_left_values(left, right))
@@ -51,9 +51,14 @@ test "generated differential corpus agrees with array oracle" {
     )
     assert_true(a.validate() is Ok(_))
     assert_true(b.validate() is Ok(_))
-    assert_eq(decode_auto(a.encode_words()).unwrap().to_array(), a.to_array())
     assert_eq(
-      decode_auto(a.encode_run_words().unwrap()).unwrap().to_array(),
+      @moonbit-roaring.decode_auto(a.encode_words()).unwrap().to_array(),
+      a.to_array(),
+    )
+    assert_eq(
+      @moonbit-roaring.decode_auto(a.encode_run_words().unwrap())
+      .unwrap()
+      .to_array(),
       a.to_array(),
     )
   }

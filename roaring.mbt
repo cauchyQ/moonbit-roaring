@@ -94,7 +94,7 @@ let max_materialized_range = 1_000_000
 ///|
 /// Create an empty bitmap.
 pub fn RoaringBitmap::new() -> RoaringBitmap {
-  { blocks: [] }
+  { blocks: [], }
 }
 
 ///|
@@ -460,7 +460,7 @@ fn union_blocks(
       b += 1
     }
   }
-  { blocks: output }
+  { blocks: output, }
 }
 
 ///|
@@ -480,13 +480,13 @@ fn intersection_blocks(
     } else {
       let container = left[a].container.intersection(right[b].container)
       if container.cardinality() > 0 {
-        output.push({ key: left[a].key, container })
+        output.push({ key: left[a].key, container, })
       }
       a += 1
       b += 1
     }
   }
-  { blocks: output }
+  { blocks: output, }
 }
 
 ///|
@@ -507,12 +507,12 @@ fn difference_blocks(
     } else {
       let container = left[a].container.difference(right[b].container)
       if container.cardinality() > 0 {
-        output.push({ key: left[a].key, container })
+        output.push({ key: left[a].key, container, })
       }
     }
     a += 1
   }
-  { blocks: output }
+  { blocks: output, }
 }
 
 ///|
@@ -534,13 +534,13 @@ fn xor_blocks(
     } else {
       let container = left[a].container.xor(right[b].container)
       if container.cardinality() > 0 {
-        output.push({ key: left[a].key, container })
+        output.push({ key: left[a].key, container, })
       }
       a += 1
       b += 1
     }
   }
-  { blocks: output }
+  { blocks: output, }
 }
 
 ///|
@@ -554,7 +554,7 @@ fn from_sorted(values : Array[Int]) -> RoaringBitmap {
       lows.push(values[index] % block_size)
       index += 1
     }
-    blocks.push({ key, container: Container::from_lows(lows) })
+    blocks.push({ key, container: Container::from_lows(lows), })
   }
   { blocks, }
 }
@@ -843,11 +843,11 @@ fn make_runs(lows : Array[Int]) -> Array[Run] {
   for index in 1..<lows.length() {
     let low = lows[index]
     if low != previous + 1 {
-      output.push({ start, end: previous })
+      output.push({ start, end: previous, })
       start = low
     }
     previous = low
   }
-  output.push({ start, end: previous })
+  output.push({ start, end: previous, })
   output
 }

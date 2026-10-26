@@ -20,7 +20,7 @@ pub fn RoaringBitmap::frame(
   format : CodecFormat,
 ) -> Result[BitmapFrame, CodecError] {
   match self.encode(format) {
-    Ok(payload) => Ok({ format, checksum: frame_checksum(payload), payload })
+    Ok(payload) => Ok({ format, checksum: frame_checksum(payload), payload, })
     Err(error) => Err(error)
   }
 }
@@ -46,7 +46,7 @@ pub fn BitmapFrame::with_payload(
   self : BitmapFrame,
   payload : Array[Int],
 ) -> BitmapFrame {
-  { format: self.format, checksum: self.checksum, payload }
+  { format: self.format, checksum: self.checksum, payload, }
 }
 
 ///|

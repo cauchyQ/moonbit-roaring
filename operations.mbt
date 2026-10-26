@@ -24,7 +24,7 @@ pub(all) struct IntRange {
 ///|
 /// Create an empty builder.
 pub fn RoaringBuilder::new() -> RoaringBuilder {
-  { values: [] }
+  { values: [], }
 }
 
 ///|
@@ -245,7 +245,7 @@ pub fn RoaringBitmap::to_ranges(
       if previous == 2_147_483_647 {
         return Err(RangeEndpointOverflow(previous))
       }
-      output.push({ start, end: previous + 1 })
+      output.push({ start, end: previous + 1, })
       start = value
     }
     previous = value
@@ -253,7 +253,7 @@ pub fn RoaringBitmap::to_ranges(
   if previous == 2_147_483_647 {
     Err(RangeEndpointOverflow(previous))
   } else {
-    output.push({ start, end: previous + 1 })
+    output.push({ start, end: previous + 1, })
     Ok(output)
   }
 }
@@ -261,7 +261,7 @@ pub fn RoaringBitmap::to_ranges(
 ///|
 /// Start a stable ascending cursor.
 pub fn RoaringBitmap::cursor(self : RoaringBitmap) -> RoaringCursor {
-  { bitmap: self, block_index: 0, lows: [], low_index: 0, yielded: 0 }
+  { bitmap: self, block_index: 0, lows: [], low_index: 0, yielded: 0, }
 }
 
 ///|

@@ -1,7 +1,8 @@
 ///|
-/// Invalid operation-log position requests.
+/// Invalid positions or failed operations in a requested history.
 pub(all) enum JournalRangeError {
   InvalidIndex(Int, Int)
+  OperationFailed(Int, RoaringError)
 }
 
 ///|
@@ -13,12 +14,12 @@ pub fn RoaringOperationLog::operation_at(
   if index < 0 || index >= self.operations.length() {
     Err(InvalidIndex(index, self.operations.length()))
   } else {
-    Ok(self.operations[index])
+    Ok(self.operations[index].owned_copy())
   }
 }
 
 ///|
-/// Replay exactly the first `count` operations from this log checkpoint.
+/// Replay exactly the first `count` operations, reporting a zero-based failure index.
 pub fn RoaringOperationLog::replay_prefix(
   self : RoaringOperationLog,
   count : Int,
@@ -30,7 +31,7 @@ pub fn RoaringOperationLog::replay_prefix(
   for index in 0..<count {
     match self.operations[index].apply(current) {
       Ok(next) => current = next
-      Err(_) => return Ok(self.checkpoint)
+      Err(error) => return Err(OperationFailed(index, error))
     }
   }
   Ok(current)
@@ -42,8 +43,9 @@ pub fn RoaringOperationLog::split_at(
   self : RoaringOperationLog,
   count : Int,
 ) -> Result[(RoaringOperationLog, RoaringOperationLog), JournalRangeError] {
-  if count < 0 || count > self.operations.length() {
-    return Err(InvalidIndex(count, self.operations.length()))
+  let checkpoint = match self.replay_prefix(count) {
+    Ok(bitmap) => bitmap
+    Err(error) => return Err(error)
   }
   let prefix_operations : Array[BitmapOperation] = []
   let suffix_operations : Array[BitmapOperation] = []
@@ -54,33 +56,34 @@ pub fn RoaringOperationLog::split_at(
       suffix_operations.push(self.operations[index])
     }
   }
-  let prefix = RoaringOperationLog::new(self.checkpoint).append_all(
-    prefix_operations,
-  )
-  let checkpoint = match prefix.replay() {
-    Ok(bitmap) => bitmap
-    Err(_) => self.checkpoint
+  // Stored payloads are already owned and never mutated; only queues are split.
+  let prefix : RoaringOperationLog = {
+    checkpoint: self.checkpoint,
+    operations: prefix_operations,
   }
-  Ok(
-    (prefix, RoaringOperationLog::new(checkpoint).append_all(suffix_operations)),
-  )
+  let suffix : RoaringOperationLog = {
+    checkpoint,
+    operations: suffix_operations,
+  }
+  Ok((prefix, suffix))
 }
 
 ///|
-/// Return cumulative cardinalities after each replayed operation, including the checkpoint.
+/// Return cumulative cardinalities, or the first failure with a zero-based index.
 pub fn RoaringOperationLog::cardinality_history(
   self : RoaringOperationLog,
-) -> Array[Int] {
+) -> Result[Array[Int], JournalRangeError] {
   let output : Array[Int] = [self.checkpoint.cardinality()]
   let mut current = self.checkpoint
-  for operation in self.operations {
+  for index in 0..<self.operations.length() {
+    let operation = self.operations[index]
     match operation.apply(current) {
       Ok(next) => {
         current = next
         output.push(current.cardinality())
       }
-      Err(_) => output.push(current.cardinality())
+      Err(error) => return Err(OperationFailed(index, error))
     }
   }
-  output
+  Ok(output)
 }
