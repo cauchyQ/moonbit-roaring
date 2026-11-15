@@ -61,7 +61,7 @@ pub fn RoaringBitmap::relation_to(
 pub fn RoaringBitmap::symmetric_difference_cardinality(
   self : RoaringBitmap,
   other : RoaringBitmap,
-) -> Int {
+) -> Int32 {
   self.xor(other).cardinality()
 }
 
@@ -70,7 +70,7 @@ pub fn RoaringBitmap::symmetric_difference_cardinality(
 pub fn RoaringBitmap::intersection_cardinality(
   self : RoaringBitmap,
   other : RoaringBitmap,
-) -> Int {
+) -> Int32 {
   self.intersection(other).cardinality()
 }
 
@@ -79,7 +79,7 @@ pub fn RoaringBitmap::intersection_cardinality(
 pub fn RoaringBitmap::union_cardinality(
   self : RoaringBitmap,
   other : RoaringBitmap,
-) -> Int {
+) -> Int32 {
   self.union(other).cardinality()
 }
 
@@ -88,7 +88,7 @@ pub fn RoaringBitmap::union_cardinality(
 pub fn RoaringBitmap::difference_cardinality(
   self : RoaringBitmap,
   other : RoaringBitmap,
-) -> Int {
+) -> Int32 {
   self.difference(other).cardinality()
 }
 
@@ -97,7 +97,7 @@ pub fn RoaringBitmap::difference_cardinality(
 pub fn RoaringBitmap::containment_gaps(
   self : RoaringBitmap,
   other : RoaringBitmap,
-) -> (Int, Int) {
+) -> (Int32, Int32) {
   (other.difference(self).cardinality(), self.difference(other).cardinality())
 }
 
@@ -107,7 +107,7 @@ pub fn RoaringBitmap::containment_gaps(
 pub fn RoaringBitmap::overlap_coefficient_parts(
   self : RoaringBitmap,
   other : RoaringBitmap,
-) -> (Int, Int) {
+) -> (Int32, Int32) {
   let left = self.cardinality()
   let right = other.cardinality()
   let denominator = if left < right { left } else { right }

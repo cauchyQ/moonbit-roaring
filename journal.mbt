@@ -2,11 +2,11 @@
 /// Parse failures for the versioned operation-journal word format.
 pub(all) enum JournalCodecError {
   MissingHeader
-  UnsupportedVersion(Int)
-  InvalidOperationCount(Int)
-  InvalidTag(Int)
-  TruncatedPayload(Int)
-  InvalidBatchCount(Int)
+  UnsupportedVersion(Int32)
+  InvalidOperationCount(Int32)
+  InvalidTag(Int32)
+  TruncatedPayload(Int32)
+  InvalidBatchCount(Int32)
 }
 
 ///|
@@ -14,8 +14,8 @@ pub(all) enum JournalCodecError {
 /// Tags 1-6 represent Add, Remove, AddRange, RemoveRange, AddAll, RemoveAll.
 pub fn RoaringOperationLog::encode_words(
   self : RoaringOperationLog,
-) -> Array[Int] {
-  let output : Array[Int] = [1, self.operations.length()]
+) -> Array[Int32] {
+  let output : Array[Int32] = [1, self.operations.length()]
   for operation in self.operations {
     match operation {
       Add(value) => {
@@ -59,7 +59,7 @@ pub fn RoaringOperationLog::encode_words(
 /// Decode a stable journal payload with a caller-provided checkpoint.
 pub fn decode_operation_log(
   checkpoint : RoaringBitmap,
-  words : Array[Int],
+  words : Array[Int32],
 ) -> Result[RoaringOperationLog, JournalCodecError] {
   if words.length() == 0 {
     return Err(MissingHeader)
@@ -113,7 +113,7 @@ pub fn decode_operation_log(
       if count < 0 || count > words.length() - index {
         return Err(InvalidBatchCount(count))
       }
-      let values : Array[Int] = []
+      let values : Array[Int32] = []
       for _ in 0..<count {
         values.push(words[index])
         index += 1

@@ -2,12 +2,12 @@
 /// Read-only execution information for a catalog query.
 pub(all) struct QueryExecutionTrace {
   result : RoaringBitmap
-  nodes : Int
-  depth : Int
-  requested_keys : Array[Int]
-  resolved_keys : Array[Int]
-  missing_keys : Array[Int]
-  result_cardinality : Int
+  nodes : Int32
+  depth : Int32
+  requested_keys : Array[Int32]
+  resolved_keys : Array[Int32]
+  missing_keys : Array[Int32]
+  result_cardinality : Int32
 }
 
 ///|
@@ -19,8 +19,8 @@ pub fn BitmapCatalog::execute_with_trace(
 ) -> QueryExecutionTrace {
   let query_stats = query.stats()
   let requested = query.referenced_keys()
-  let resolved : Array[Int] = []
-  let missing : Array[Int] = []
+  let resolved : Array[Int32] = []
+  let missing : Array[Int32] = []
   for key in requested {
     match self.get(key) {
       Some(_) => if !resolved.contains(key) { resolved.push(key) }
@@ -46,7 +46,7 @@ pub fn CatalogQuery::result_upper_bound(
   self : CatalogQuery,
   catalog : BitmapCatalog,
   universe : RoaringBitmap,
-) -> Int {
+) -> Int32 {
   match self {
     Key(key) => catalog.get(key).unwrap_or(RoaringBitmap::new()).cardinality()
     Not(_) => universe.cardinality()

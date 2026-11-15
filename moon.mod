@@ -13,3 +13,7 @@ keywords = [ "roaring", "bitmap", "index", "set" ]
 preferred_target = "wasm"
 
 description = "Pure MoonBit 32-bit Roaring Bitmap indexes"
+
+import {
+  "xcc-ordinary/moonbit-roaring@0.1.0",
+}

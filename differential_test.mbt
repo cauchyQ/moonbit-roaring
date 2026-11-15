@@ -1,8 +1,8 @@
 ///|
-fn oracle_unique(values : Array[Int]) -> Array[Int] {
+fn oracle_unique(values : Array[Int32]) -> Array[Int32] {
   let sorted = values.copy()
   sorted.sort()
-  let output : Array[Int] = []
+  let output : Array[Int32] = []
   for value in sorted {
     if output.length() == 0 || output[output.length() - 1] != value {
       output.push(value)
@@ -12,18 +12,27 @@ fn oracle_unique(values : Array[Int]) -> Array[Int] {
 }
 
 ///|
-fn oracle_union_values(left : Array[Int], right : Array[Int]) -> Array[Int] {
+fn oracle_union_values(
+  left : Array[Int32],
+  right : Array[Int32],
+) -> Array[Int32] {
   oracle_unique(left + right)
 }
 
 ///|
-fn oracle_common_values(left : Array[Int], right : Array[Int]) -> Array[Int] {
+fn oracle_common_values(
+  left : Array[Int32],
+  right : Array[Int32],
+) -> Array[Int32] {
   let right_set = oracle_unique(right)
   oracle_unique(left).filter(value => right_set.contains(value))
 }
 
 ///|
-fn oracle_left_values(left : Array[Int], right : Array[Int]) -> Array[Int] {
+fn oracle_left_values(
+  left : Array[Int32],
+  right : Array[Int32],
+) -> Array[Int32] {
   let right_set = oracle_unique(right)
   oracle_unique(left).filter(value => !right_set.contains(value))
 }
@@ -31,8 +40,8 @@ fn oracle_left_values(left : Array[Int], right : Array[Int]) -> Array[Int] {
 ///|
 test "generated differential corpus agrees with array oracle" {
   for seed in 0..<128 {
-    let left : Array[Int] = []
-    let right : Array[Int] = []
+    let left : Array[Int32] = []
+    let right : Array[Int32] = []
     for index in 0..<48 {
       left.push((seed * 109 + index * 673) % 140_000)
       right.push((seed * 251 + index * 431 + 11) % 140_000)

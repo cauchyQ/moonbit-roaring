@@ -2,12 +2,12 @@
 /// Exact comparison facts for two bitmaps, suitable for reporting decisions.
 pub(all) struct BitmapComparison {
   relation : SetRelation
-  left_cardinality : Int
-  right_cardinality : Int
-  common_cardinality : Int
-  left_only_cardinality : Int
-  right_only_cardinality : Int
-  union_cardinality : Int
+  left_cardinality : Int32
+  right_cardinality : Int32
+  common_cardinality : Int32
+  left_only_cardinality : Int32
+  right_only_cardinality : Int32
+  union_cardinality : Int32
 }
 
 ///|
@@ -37,7 +37,7 @@ pub fn compare_bitmaps(
 pub fn precision_parts(
   actual : RoaringBitmap,
   expected : RoaringBitmap,
-) -> (Int, Int) {
+) -> (Int32, Int32) {
   (actual.intersection_cardinality(expected), actual.cardinality())
 }
 
@@ -46,13 +46,16 @@ pub fn precision_parts(
 pub fn recall_parts(
   actual : RoaringBitmap,
   expected : RoaringBitmap,
-) -> (Int, Int) {
+) -> (Int32, Int32) {
   (actual.intersection_cardinality(expected), expected.cardinality())
 }
 
 ///|
 /// Return exact F1 components `(two_times_common, actual_plus_expected)`.
-pub fn f1_parts(actual : RoaringBitmap, expected : RoaringBitmap) -> (Int, Int) {
+pub fn f1_parts(
+  actual : RoaringBitmap,
+  expected : RoaringBitmap,
+) -> (Int32, Int32) {
   (
     2 * actual.intersection_cardinality(expected),
     actual.cardinality() + expected.cardinality(),

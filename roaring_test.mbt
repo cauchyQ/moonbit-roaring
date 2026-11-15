@@ -44,7 +44,7 @@ test "dense bitmap operations use word algebra and downshift sparse results" {
 
 ///|
 test "block diagnostics expose selected representations without internals" {
-  let values : Array[Int] = [1]
+  let values : Array[Int32] = [1]
   for value in 70_000..<70_006 {
     values.push(value)
   }
@@ -409,8 +409,8 @@ test "builder stages atomically and normalizes exactly once at finish" {
 ///|
 test "deterministic property corpus preserves set laws and codec round trips" {
   for seed in 0..<64 {
-    let left_values : Array[Int] = []
-    let right_values : Array[Int] = []
+    let left_values : Array[Int32] = []
+    let right_values : Array[Int32] = []
     for index in 0..<48 {
       left_values.push((seed * 997 + index * 7_919) % 140_000)
       right_values.push((seed * 1_309 + index * 6_151 + 23) % 140_000)

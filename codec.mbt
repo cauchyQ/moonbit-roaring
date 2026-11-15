@@ -9,7 +9,7 @@ pub(all) enum CodecFormat {
 pub fn RoaringBitmap::encode(
   self : RoaringBitmap,
   format : CodecFormat,
-) -> Result[Array[Int], CodecError] {
+) -> Result[Array[Int32], CodecError] {
   match format {
     PlainWords => Ok(self.encode_words())
     RunWords => self.encode_run_words()
@@ -19,7 +19,7 @@ pub fn RoaringBitmap::encode(
 ///|
 pub fn decode(
   format : CodecFormat,
-  words : Array[Int],
+  words : Array[Int32],
 ) -> Result[RoaringBitmap, CodecError] {
   match format {
     PlainWords => decode_words(words)
@@ -30,10 +30,10 @@ pub fn decode(
 ///|
 /// Decode one supported format and re-encode it canonically as another.
 pub fn transcode(
-  words : Array[Int],
+  words : Array[Int32],
   from : CodecFormat,
   to : CodecFormat,
-) -> Result[Array[Int], CodecError] {
+) -> Result[Array[Int32], CodecError] {
   match decode(from, words) {
     Ok(bitmap) => bitmap.encode(to)
     Err(error) => Err(error)
@@ -42,7 +42,7 @@ pub fn transcode(
 
 ///|
 /// Inspect a stable word header without decoding its payload.
-pub fn detect_codec(words : Array[Int]) -> Result[CodecFormat, CodecError] {
+pub fn detect_codec(words : Array[Int32]) -> Result[CodecFormat, CodecError] {
   if words.length() == 0 {
     return Err(MissingHeader)
   }
@@ -55,7 +55,7 @@ pub fn detect_codec(words : Array[Int]) -> Result[CodecFormat, CodecError] {
 
 ///|
 /// Decode a supported payload using its own version header.
-pub fn decode_auto(words : Array[Int]) -> Result[RoaringBitmap, CodecError] {
+pub fn decode_auto(words : Array[Int32]) -> Result[RoaringBitmap, CodecError] {
   match detect_codec(words) {
     Ok(format) => decode(format, words)
     Err(error) => Err(error)

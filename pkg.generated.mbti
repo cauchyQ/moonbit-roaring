@@ -12,7 +12,13 @@ pub fn decode_auto(Array[Int32]) -> Result[RoaringBitmap, CodecError]
 
 pub fn decode_operation_log(RoaringBitmap, Array[Int32]) -> Result[RoaringOperationLog, JournalCodecError]
 
+pub fn decode_portable(Bytes) -> Result[RoaringBitmap, String]
+
+pub fn decode_portable_uint32(Bytes) -> Result[UInt32Bitmap, String]
+
 pub fn decode_run_words(Array[Int32]) -> Result[RoaringBitmap, CodecError]
+
+pub fn decode_uint32_patch(Bytes, String) -> Result[UInt32SnapshotPatch, String]
 
 pub fn decode_words(Array[Int32]) -> Result[RoaringBitmap, CodecError]
 
@@ -157,6 +163,7 @@ pub(all) enum CodecError {
   InvalidRunLength(Int32)
   CardinalityMismatch(Int32, Int32)
   PayloadTooLarge(Int32)
+  NonIncreasingGeneration(Int32, Int32)
   NonCanonicalPayload
 }
 
@@ -261,6 +268,7 @@ pub fn RoaringBitmap::remove_ranges(Self, Array[IntRange]) -> Result[Self, Roari
 pub fn RoaringBitmap::sample_evenly(Self, Int32) -> Array[Int32]
 pub fn RoaringBitmap::sample_stride(Self, Int32) -> Array[Int32]
 pub fn RoaringBitmap::select(Self, Int32) -> Int32?
+pub fn RoaringBitmap::serialize_portable(Self) -> Bytes
 pub fn RoaringBitmap::shift(Self, Int32) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::slice_positions(Self, Int32, Int32) -> Result[Self, RoaringError]
 pub fn RoaringBitmap::stats(Self) -> RoaringStats
@@ -382,17 +390,64 @@ pub(all) enum SnapshotError {
   InvalidGeneration(Int32)
   GenerationOverflow(Int32)
   StaleGeneration(Int32, Int32)
+  BaselineMismatch(Int32, Int32)
+  TargetMismatch(Int32, Int32)
+  NonIncreasingGeneration(Int32, Int32)
   Frame(FrameError)
 }
 
 pub(all) struct SnapshotPatchEnvelope {
   base_generation : Int32
   target_generation : Int32
+  base_checksum : Int32
+  target_checksum : Int32
+  base_words : Array[Int32]
+  target_words : Array[Int32]
   additions : BitmapFrame
   removals : BitmapFrame
 }
 pub fn SnapshotPatchEnvelope::base_generation(Self) -> Int32
 pub fn SnapshotPatchEnvelope::target_generation(Self) -> Int32
+
+pub struct UInt32Bitmap {
+  shards : Array[RoaringBitmap]
+}
+pub fn UInt32Bitmap::add(Self, UInt32) -> Self
+pub fn UInt32Bitmap::add_range(Self, UInt64, UInt64) -> Result[Self, String]
+pub fn UInt32Bitmap::cardinality(Self) -> UInt64
+pub fn UInt32Bitmap::contains(Self, UInt32) -> Bool
+pub fn UInt32Bitmap::difference(Self, Self) -> Self
+pub fn UInt32Bitmap::intersection(Self, Self) -> Self
+pub fn UInt32Bitmap::new() -> Self
+pub fn UInt32Bitmap::rank(Self, UInt32) -> UInt64
+pub fn UInt32Bitmap::remove(Self, UInt32) -> Self
+pub fn UInt32Bitmap::remove_range(Self, UInt64, UInt64) -> Result[Self, String]
+pub fn UInt32Bitmap::select(Self, UInt64) -> UInt32?
+pub fn UInt32Bitmap::serialize_portable(Self) -> Result[Bytes, String]
+pub fn UInt32Bitmap::union(Self, Self) -> Self
+pub fn UInt32Bitmap::xor(Self, Self) -> Self
+
+pub struct UInt32Snapshot {
+  dataset : String
+  generation : UInt64
+  bitmap : UInt32Bitmap
+}
+pub fn UInt32Snapshot::apply(Self, UInt32SnapshotPatch) -> Result[Self, String]
+pub fn UInt32Snapshot::bitmap(Self) -> UInt32Bitmap
+pub fn UInt32Snapshot::diff_to(Self, Self) -> Result[UInt32SnapshotPatch, String]
+pub fn UInt32Snapshot::generation(Self) -> UInt64
+pub fn UInt32Snapshot::new(String, UInt64, UInt32Bitmap) -> Self
+
+pub struct UInt32SnapshotPatch {
+  dataset : String
+  base_generation : UInt64
+  target_generation : UInt64
+  base_digest : Bytes
+  target_digest : Bytes
+  additions : UInt32Bitmap
+  removals : UInt32Bitmap
+}
+pub fn UInt32SnapshotPatch::serialize(Self) -> Bytes
 
 pub(all) enum ValidationError {
   UnsortedBlockKey(Int32, Int32)

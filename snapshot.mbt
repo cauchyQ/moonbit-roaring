@@ -1,31 +1,38 @@
 ///|
 /// An immutable bitmap state identified by a monotonically increasing generation.
 pub struct RoaringSnapshot {
-  generation : Int
+  generation : Int32
   bitmap : RoaringBitmap
 }
 
 ///|
 /// Errors at snapshot generation and frame boundaries.
 pub(all) enum SnapshotError {
-  InvalidGeneration(Int)
-  GenerationOverflow(Int)
-  StaleGeneration(Int, Int)
+  InvalidGeneration(Int32)
+  GenerationOverflow(Int32)
+  StaleGeneration(Int32, Int32)
+  BaselineMismatch(Int32, Int32)
+  TargetMismatch(Int32, Int32)
+  NonIncreasingGeneration(Int32, Int32)
   Frame(FrameError)
 }
 
 ///|
 /// A transportable snapshot envelope with its self-checking bitmap frame.
 pub(all) struct SnapshotEnvelope {
-  generation : Int
+  generation : Int32
   frame : BitmapFrame
 }
 
 ///|
 /// A checked patch between two exact snapshot generations.
 pub(all) struct SnapshotPatchEnvelope {
-  base_generation : Int
-  target_generation : Int
+  base_generation : Int32
+  target_generation : Int32
+  base_checksum : Int32
+  target_checksum : Int32
+  base_words : Array[Int32]
+  target_words : Array[Int32]
   additions : BitmapFrame
   removals : BitmapFrame
 }
@@ -39,7 +46,7 @@ pub fn RoaringSnapshot::new(bitmap : RoaringBitmap) -> RoaringSnapshot {
 ///|
 /// Create a snapshot at an explicit non-negative generation.
 pub fn RoaringSnapshot::at(
-  generation : Int,
+  generation : Int32,
   bitmap : RoaringBitmap,
 ) -> Result[RoaringSnapshot, SnapshotError] {
   if generation < 0 {
@@ -51,7 +58,7 @@ pub fn RoaringSnapshot::at(
 
 ///|
 /// Return the snapshot generation.
-pub fn RoaringSnapshot::generation(self : RoaringSnapshot) -> Int {
+pub fn RoaringSnapshot::generation(self : RoaringSnapshot) -> Int32 {
   self.generation
 }
 
@@ -110,7 +117,7 @@ pub fn SnapshotEnvelope::decode(
 
 ///|
 /// Return envelope generation without decoding its payload.
-pub fn SnapshotEnvelope::generation(self : SnapshotEnvelope) -> Int {
+pub fn SnapshotEnvelope::generation(self : SnapshotEnvelope) -> Int32 {
   self.generation
 }
 
@@ -121,6 +128,9 @@ pub fn RoaringSnapshot::patch_envelope(
   target : RoaringSnapshot,
   format : CodecFormat,
 ) -> Result[SnapshotPatchEnvelope, CodecError] {
+  if target.generation <= self.generation {
+    return Err(NonIncreasingGeneration(self.generation, target.generation))
+  }
   let patch = self.diff_to(target)
   match patch.additions.frame(format) {
     Err(error) => Err(error)
@@ -131,6 +141,10 @@ pub fn RoaringSnapshot::patch_envelope(
           Ok({
             base_generation: self.generation,
             target_generation: target.generation,
+            base_checksum: frame_checksum(self.bitmap.encode_words()),
+            target_checksum: frame_checksum(target.bitmap.encode_words()),
+            base_words: self.bitmap.encode_words(),
+            target_words: target.bitmap.encode_words(),
             additions,
             removals,
           })
@@ -150,6 +164,16 @@ pub fn RoaringSnapshot::apply_patch_envelope(
   if envelope.target_generation < 0 {
     return Err(InvalidGeneration(envelope.target_generation))
   }
+  if envelope.target_generation <= self.generation {
+    return Err(
+      NonIncreasingGeneration(self.generation, envelope.target_generation),
+    )
+  }
+  let actual_base_checksum = frame_checksum(self.bitmap.encode_words())
+  if actual_base_checksum != envelope.base_checksum ||
+    self.bitmap.encode_words() != envelope.base_words {
+    return Err(BaselineMismatch(envelope.base_checksum, actual_base_checksum))
+  }
   let additions = match envelope.additions.decode() {
     Ok(bitmap) => bitmap
     Err(error) => return Err(Frame(error))
@@ -158,22 +182,25 @@ pub fn RoaringSnapshot::apply_patch_envelope(
     Ok(bitmap) => bitmap
     Err(error) => return Err(Frame(error))
   }
-  Ok({
-    generation: envelope.target_generation,
-    bitmap: self.bitmap.difference(removals).union(additions),
-  })
+  let bitmap = self.bitmap.difference(removals).union(additions)
+  let actual_target_checksum = frame_checksum(bitmap.encode_words())
+  if actual_target_checksum != envelope.target_checksum ||
+    bitmap.encode_words() != envelope.target_words {
+    return Err(TargetMismatch(envelope.target_checksum, actual_target_checksum))
+  }
+  Ok({ generation: envelope.target_generation, bitmap, })
 }
 
 ///|
 pub fn SnapshotPatchEnvelope::base_generation(
   self : SnapshotPatchEnvelope,
-) -> Int {
+) -> Int32 {
   self.base_generation
 }
 
 ///|
 pub fn SnapshotPatchEnvelope::target_generation(
   self : SnapshotPatchEnvelope,
-) -> Int {
+) -> Int32 {
   self.target_generation
 }

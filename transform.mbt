@@ -2,7 +2,7 @@
 /// Keep values satisfying `predicate` and preserve normalized ordering.
 pub fn RoaringBitmap::filter(
   self : RoaringBitmap,
-  predicate : (Int) -> Bool,
+  predicate : (Int32) -> Bool,
 ) -> RoaringBitmap {
   from_sorted(self.to_array().filter(predicate))
 }
@@ -12,9 +12,9 @@ pub fn RoaringBitmap::filter(
 /// rejected instead of silently dropping it.
 pub fn RoaringBitmap::map_values(
   self : RoaringBitmap,
-  mapper : (Int) -> Int,
+  mapper : (Int32) -> Int32,
 ) -> Result[RoaringBitmap, RoaringError] {
-  let values : Array[Int] = []
+  let values : Array[Int32] = []
   for value in self.to_array() {
     let mapped = mapper(value)
     if mapped < 0 {
@@ -29,10 +29,10 @@ pub fn RoaringBitmap::map_values(
 /// Split values into matching and non-matching bitmaps.
 pub fn RoaringBitmap::partition(
   self : RoaringBitmap,
-  predicate : (Int) -> Bool,
+  predicate : (Int32) -> Bool,
 ) -> (RoaringBitmap, RoaringBitmap) {
-  let yes : Array[Int] = []
-  let no : Array[Int] = []
+  let yes : Array[Int32] = []
+  let no : Array[Int32] = []
   for value in self.to_array() {
     if predicate(value) {
       yes.push(value)
@@ -45,11 +45,14 @@ pub fn RoaringBitmap::partition(
 
 ///|
 /// Keep the first `count` values in ascending order. Negative counts are empty.
-pub fn RoaringBitmap::take(self : RoaringBitmap, count : Int) -> RoaringBitmap {
+pub fn RoaringBitmap::take(
+  self : RoaringBitmap,
+  count : Int32,
+) -> RoaringBitmap {
   if count <= 0 {
     return RoaringBitmap::new()
   }
-  let output : Array[Int] = []
+  let output : Array[Int32] = []
   let values = self.to_array()
   for index in 0..<values.length() {
     if index < count {
@@ -61,11 +64,14 @@ pub fn RoaringBitmap::take(self : RoaringBitmap, count : Int) -> RoaringBitmap {
 
 ///|
 /// Discard the first `count` values in ascending order. Negative counts are a no-op.
-pub fn RoaringBitmap::drop(self : RoaringBitmap, count : Int) -> RoaringBitmap {
+pub fn RoaringBitmap::drop(
+  self : RoaringBitmap,
+  count : Int32,
+) -> RoaringBitmap {
   if count <= 0 {
     return self
   }
-  let output : Array[Int] = []
+  let output : Array[Int32] = []
   let values = self.to_array()
   for index in 0..<values.length() {
     if index >= count {
@@ -79,13 +85,13 @@ pub fn RoaringBitmap::drop(self : RoaringBitmap, count : Int) -> RoaringBitmap {
 /// Select values whose zero-based positions belong to `[start, end)`.
 pub fn RoaringBitmap::slice_positions(
   self : RoaringBitmap,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
 ) -> Result[RoaringBitmap, RoaringError] {
   if start < 0 || end < start {
     return Err(InvalidRange(start, end))
   }
-  let output : Array[Int] = []
+  let output : Array[Int32] = []
   let values = self.to_array()
   for index in 0..<values.length() {
     if start <= index && index < end {
@@ -100,9 +106,9 @@ pub fn RoaringBitmap::slice_positions(
 /// non-negative `Int` domain.
 pub fn RoaringBitmap::shift(
   self : RoaringBitmap,
-  offset : Int,
+  offset : Int32,
 ) -> Result[RoaringBitmap, RoaringError] {
-  let values : Array[Int] = []
+  let values : Array[Int32] = []
   for value in self.to_array() {
     if offset < 0 && value < -offset {
       return Err(NegativeValue(value + offset))

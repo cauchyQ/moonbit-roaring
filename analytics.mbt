@@ -1,11 +1,11 @@
 ///|
 /// Compact summary of the numeric extent of a bitmap.
 pub(all) struct BitmapProfile {
-  cardinality : Int
-  minimum : Int?
-  maximum : Int?
-  span : Int
-  block_count : Int
+  cardinality : Int32
+  minimum : Int32?
+  maximum : Int32?
+  span : Int32
+  block_count : Int32
 }
 
 ///|
@@ -32,7 +32,7 @@ pub fn RoaringBitmap::profile(self : RoaringBitmap) -> BitmapProfile {
 pub fn RoaringBitmap::jaccard_parts(
   self : RoaringBitmap,
   other : RoaringBitmap,
-) -> (Int, Int) {
+) -> (Int32, Int32) {
   (self.intersection(other).cardinality(), self.union(other).cardinality())
 }
 
@@ -40,9 +40,9 @@ pub fn RoaringBitmap::jaccard_parts(
 /// Return a stable, evenly distributed sample in ascending order.
 pub fn RoaringBitmap::sample_evenly(
   self : RoaringBitmap,
-  count : Int,
-) -> Array[Int] {
-  let output : Array[Int] = []
+  count : Int32,
+) -> Array[Int32] {
+  let output : Array[Int32] = []
   let total = self.cardinality()
   if count <= 0 || total == 0 {
     return output
@@ -62,9 +62,9 @@ pub fn RoaringBitmap::sample_evenly(
 /// Select the value at an exact rational quantile in `[0, denominator]`.
 pub fn RoaringBitmap::quantile(
   self : RoaringBitmap,
-  numerator : Int,
-  denominator : Int,
-) -> Result[Int?, RoaringError] {
+  numerator : Int32,
+  denominator : Int32,
+) -> Result[Int32?, RoaringError] {
   if denominator <= 0 || numerator < 0 || numerator > denominator {
     return Err(InvalidRange(numerator, denominator))
   }
@@ -80,7 +80,7 @@ pub fn RoaringBitmap::quantile(
 pub fn RoaringBitmap::overlap_parts(
   self : RoaringBitmap,
   other : RoaringBitmap,
-) -> (Int, Int, Int, Int) {
+) -> (Int32, Int32, Int32, Int32) {
   let common = self.intersection(other).cardinality()
   let left_only = self.cardinality() - common
   let right_only = other.cardinality() - common
@@ -89,7 +89,7 @@ pub fn RoaringBitmap::overlap_parts(
 
 ///|
 /// Return occupied and total positions in the bitmap's inclusive numeric span.
-pub fn RoaringBitmap::density_parts(self : RoaringBitmap) -> (Int, Int) {
+pub fn RoaringBitmap::density_parts(self : RoaringBitmap) -> (Int32, Int32) {
   let profile = self.profile()
   (profile.cardinality, profile.span)
 }
@@ -98,9 +98,9 @@ pub fn RoaringBitmap::density_parts(self : RoaringBitmap) -> (Int, Int) {
 /// Sample each `stride`th ordinal. Non-positive strides return an empty sample.
 pub fn RoaringBitmap::sample_stride(
   self : RoaringBitmap,
-  stride : Int,
-) -> Array[Int] {
-  let output : Array[Int] = []
+  stride : Int32,
+) -> Array[Int32] {
+  let output : Array[Int32] = []
   if stride <= 0 {
     return output
   }

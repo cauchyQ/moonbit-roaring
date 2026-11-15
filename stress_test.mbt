@@ -1,10 +1,10 @@
 ///|
 fn generated_values(
-  seed : Int,
-  multiplier : Int,
-  increment : Int,
-) -> Array[Int] {
-  let values : Array[Int] = []
+  seed : Int32,
+  multiplier : Int32,
+  increment : Int32,
+) -> Array[Int32] {
+  let values : Array[Int32] = []
   for index in 0..<96 {
     values.push(
       (seed * multiplier + index * increment + index * index) % 180_000,
@@ -14,10 +14,10 @@ fn generated_values(
 }
 
 ///|
-fn normalized_oracle(values : Array[Int]) -> Array[Int] {
+fn normalized_oracle(values : Array[Int32]) -> Array[Int32] {
   let sorted = values.copy()
   sorted.sort()
-  let output : Array[Int] = []
+  let output : Array[Int32] = []
   for value in sorted {
     if output.length() == 0 || output[output.length() - 1] != value {
       output.push(value)
@@ -27,12 +27,12 @@ fn normalized_oracle(values : Array[Int]) -> Array[Int] {
 }
 
 ///|
-fn oracle_contains(values : Array[Int], value : Int) -> Bool {
+fn oracle_contains(values : Array[Int32], value : Int32) -> Bool {
   normalized_oracle(values).contains(value)
 }
 
 ///|
-fn oracle_rank(values : Array[Int], value : Int) -> Int {
+fn oracle_rank(values : Array[Int32], value : Int32) -> Int32 {
   normalized_oracle(values).filter(item => item <= value).length()
 }
 
@@ -71,10 +71,10 @@ test "generated algebra agrees with explicit value membership oracle" {
     let right = @moonbit-roaring.RoaringBitmap::from_array(right_raw).unwrap()
     let left_values = normalized_oracle(left_raw)
     let right_values = normalized_oracle(right_raw)
-    let union_expected : Array[Int] = []
-    let intersection_expected : Array[Int] = []
-    let difference_expected : Array[Int] = []
-    let xor_expected : Array[Int] = []
+    let union_expected : Array[Int32] = []
+    let intersection_expected : Array[Int32] = []
+    let difference_expected : Array[Int32] = []
+    let xor_expected : Array[Int32] = []
     for value in 0..<180_000 {
       let in_left = left_values.contains(value)
       let in_right = right_values.contains(value)

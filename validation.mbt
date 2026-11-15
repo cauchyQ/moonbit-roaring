@@ -1,13 +1,13 @@
 ///|
 /// Structural invariant failures reported by `validate`.
 pub(all) enum ValidationError {
-  UnsortedBlockKey(Int, Int)
-  EmptyBlock(Int)
-  InvalidLowValue(Int, Int)
-  UnsortedLowValue(Int, Int, Int)
-  BitmapCardinalityMismatch(Int, Int)
-  RunCardinalityMismatch(Int, Int)
-  InvalidRun(Int, Int, Int)
+  UnsortedBlockKey(Int32, Int32)
+  EmptyBlock(Int32)
+  InvalidLowValue(Int32, Int32)
+  UnsortedLowValue(Int32, Int32, Int32)
+  BitmapCardinalityMismatch(Int32, Int32)
+  RunCardinalityMismatch(Int32, Int32)
+  InvalidRun(Int32, Int32, Int32)
 }
 
 ///|

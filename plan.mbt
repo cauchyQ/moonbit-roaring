@@ -6,8 +6,8 @@ pub(all) enum BitmapPlan {
   Intersection(BitmapPlan, BitmapPlan)
   Difference(BitmapPlan, BitmapPlan)
   Xor(BitmapPlan, BitmapPlan)
-  Take(BitmapPlan, Int)
-  Drop(BitmapPlan, Int)
+  Take(BitmapPlan, Int32)
+  Drop(BitmapPlan, Int32)
 }
 
 ///|
@@ -24,16 +24,16 @@ pub fn BitmapPlan::evaluate(self : BitmapPlan) -> RoaringBitmap {
 }
 
 ///|
-pub fn BitmapPlan::estimated_cardinality(self : BitmapPlan) -> Int {
+pub fn BitmapPlan::estimated_cardinality(self : BitmapPlan) -> Int32 {
   self.evaluate().cardinality()
 }
 
 ///|
 /// Static shape information for a plan before execution.
 pub(all) struct BitmapPlanStats {
-  nodes : Int
-  depth : Int
-  sources : Int
+  nodes : Int32
+  depth : Int32
+  sources : Int32
 }
 
 ///|

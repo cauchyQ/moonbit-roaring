@@ -9,23 +9,23 @@ pub struct RoaringBitmap {
 ///|
 /// One high-16-bit partition of a bitmap.
 struct RoaringBlock {
-  key : Int
+  key : Int32
   container : Container
 }
 
 ///|
 /// Inclusive low-16-bit run used for consecutive values.
 priv struct Run {
-  start : Int
-  end : Int
+  start : Int32
+  end : Int32
 }
 
 ///|
 /// The three storage forms used by the bitmap.
 priv enum Container {
-  ArrayContainer(Array[Int])
-  BitmapContainer(Array[Int], Int)
-  RunContainer(Array[Run], Int)
+  ArrayContainer(Array[Int32])
+  BitmapContainer(Array[Int32], Int32)
+  RunContainer(Array[Run], Int32)
 }
 
 ///|
@@ -40,19 +40,19 @@ priv enum WordOperation {
 ///|
 /// Input validation failures at the non-negative integer boundary.
 pub(all) enum RoaringError {
-  NegativeValue(Int)
-  InvalidRange(Int, Int)
-  RangeTooLarge(Int)
-  RangeEndpointOverflow(Int)
+  NegativeValue(Int32)
+  InvalidRange(Int32, Int32)
+  RangeTooLarge(Int32)
+  RangeEndpointOverflow(Int32)
 }
 
 ///|
 pub(all) struct RoaringStats {
-  block_count : Int
-  array_blocks : Int
-  bitmap_blocks : Int
-  run_blocks : Int
-  cardinality : Int
+  block_count : Int32
+  array_blocks : Int32
+  bitmap_blocks : Int32
+  run_blocks : Int32
+  cardinality : Int32
 }
 
 ///|
@@ -66,8 +66,8 @@ pub(all) enum ContainerKind {
 ///|
 /// Read-only diagnostics for one high-16-bit block.
 pub(all) struct RoaringBlockStats {
-  key : Int
-  cardinality : Int
+  key : Int32
+  cardinality : Int32
   kind : ContainerKind
 }
 
@@ -100,7 +100,7 @@ pub fn RoaringBitmap::new() -> RoaringBitmap {
 ///|
 /// Build a normalized bitmap from non-negative integers.
 pub fn RoaringBitmap::from_array(
-  values : Array[Int],
+  values : Array[Int32],
 ) -> Result[RoaringBitmap, RoaringError] {
   for value in values {
     if !valid_value(value) {
@@ -112,8 +112,8 @@ pub fn RoaringBitmap::from_array(
 
 ///|
 /// Return the values in ascending order.
-pub fn RoaringBitmap::to_array(self : RoaringBitmap) -> Array[Int] {
-  let output : Array[Int] = []
+pub fn RoaringBitmap::to_array(self : RoaringBitmap) -> Array[Int32] {
+  let output : Array[Int32] = []
   for block in self.blocks {
     for low in block.container.values() {
       output.push(block.key * block_size + low)
@@ -124,7 +124,7 @@ pub fn RoaringBitmap::to_array(self : RoaringBitmap) -> Array[Int] {
 
 ///|
 /// Number of distinct values stored in the bitmap.
-pub fn RoaringBitmap::cardinality(self : RoaringBitmap) -> Int {
+pub fn RoaringBitmap::cardinality(self : RoaringBitmap) -> Int32 {
   let mut total = 0
   for block in self.blocks {
     total += block.container.cardinality()
@@ -138,7 +138,7 @@ pub fn RoaringBitmap::is_empty(self : RoaringBitmap) -> Bool {
 }
 
 ///|
-pub fn RoaringBitmap::minimum(self : RoaringBitmap) -> Int? {
+pub fn RoaringBitmap::minimum(self : RoaringBitmap) -> Int32? {
   if self.is_empty() {
     None
   } else {
@@ -150,7 +150,7 @@ pub fn RoaringBitmap::minimum(self : RoaringBitmap) -> Int? {
 }
 
 ///|
-pub fn RoaringBitmap::maximum(self : RoaringBitmap) -> Int? {
+pub fn RoaringBitmap::maximum(self : RoaringBitmap) -> Int32? {
   if self.is_empty() {
     None
   } else {
@@ -207,7 +207,7 @@ pub fn RoaringBitmap::block_stats(
 
 ///|
 /// True when `value` belongs to this bitmap.
-pub fn RoaringBitmap::contains(self : RoaringBitmap, value : Int) -> Bool {
+pub fn RoaringBitmap::contains(self : RoaringBitmap, value : Int32) -> Bool {
   if !valid_value(value) {
     return false
   }
@@ -228,7 +228,7 @@ pub fn RoaringBitmap::contains(self : RoaringBitmap, value : Int) -> Bool {
 /// Insert one value. Insertion is idempotent and returns a new bitmap.
 pub fn RoaringBitmap::add(
   self : RoaringBitmap,
-  value : Int,
+  value : Int32,
 ) -> Result[RoaringBitmap, RoaringError] {
   if !valid_value(value) {
     return Err(NegativeValue(value))
@@ -259,7 +259,7 @@ pub fn RoaringBitmap::add(
 /// Remove one value. Removing an absent value is a no-op.
 pub fn RoaringBitmap::remove(
   self : RoaringBitmap,
-  value : Int,
+  value : Int32,
 ) -> RoaringBitmap {
   if !valid_value(value) {
     return self
@@ -291,8 +291,8 @@ pub fn RoaringBitmap::remove(
 /// Add every value in the half-open range `[start, end)`.
 pub fn RoaringBitmap::add_range(
   self : RoaringBitmap,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
 ) -> Result[RoaringBitmap, RoaringError] {
   if start < 0 || end < start {
     return Err(InvalidRange(start, end))
@@ -300,11 +300,39 @@ pub fn RoaringBitmap::add_range(
   if end - start > max_materialized_range {
     return Err(RangeTooLarge(end - start))
   }
-  let values = self.to_array()
-  for value in start..<end {
-    values.push(value)
+  if start == end {
+    return Ok(self)
   }
-  Ok(from_sorted(normalize(values)))
+  let blocks : Array[RoaringBlock] = []
+  let mut cursor = start
+  while cursor < end {
+    let key = cursor / block_size
+    let low_start = cursor % block_size
+    let length = if end - cursor < block_size - low_start {
+      end - cursor
+    } else {
+      block_size - low_start
+    }
+    let container = if length >= bitmap_threshold {
+      let words = Array::make(word_count, 0)
+      for low in low_start..<(low_start + length) {
+        words[low / word_bits] = words[low / word_bits] |
+          (1 << (low % word_bits))
+      }
+      BitmapContainer(words, length)
+    } else if length > 2 {
+      RunContainer([{ start: low_start, end: low_start + length - 1, }], length)
+    } else {
+      let lows : Array[Int32] = []
+      for low in low_start..<(low_start + length) {
+        lows.push(low)
+      }
+      ArrayContainer(lows)
+    }
+    blocks.push({ key, container, })
+    cursor += length
+  }
+  Ok(self.union({ blocks, }))
 }
 
 ///|
@@ -361,7 +389,7 @@ pub fn RoaringBitmap::is_subset_of(
 
 ///|
 /// Number of values less than or equal to `value`.
-pub fn RoaringBitmap::rank(self : RoaringBitmap, value : Int) -> Int {
+pub fn RoaringBitmap::rank(self : RoaringBitmap, value : Int32) -> Int32 {
   if value < 0 {
     return 0
   }
@@ -382,7 +410,7 @@ pub fn RoaringBitmap::rank(self : RoaringBitmap, value : Int) -> Int {
 
 ///|
 /// The zero-based `index`th value, if present.
-pub fn RoaringBitmap::select(self : RoaringBitmap, index : Int) -> Int? {
+pub fn RoaringBitmap::select(self : RoaringBitmap, index : Int32) -> Int32? {
   if index < 0 || index >= self.cardinality() {
     return None
   }
@@ -401,15 +429,15 @@ pub fn RoaringBitmap::select(self : RoaringBitmap, index : Int) -> Int? {
 }
 
 ///|
-fn valid_value(value : Int) -> Bool {
+fn valid_value(value : Int32) -> Bool {
   0 <= value
 }
 
 ///|
-fn normalize(values : Array[Int]) -> Array[Int] {
+fn normalize(values : Array[Int32]) -> Array[Int32] {
   let ordered = values.copy()
   ordered.sort()
-  let output : Array[Int] = []
+  let output : Array[Int32] = []
   for value in ordered {
     if output.length() == 0 || output[output.length() - 1] != value {
       output.push(value)
@@ -419,8 +447,8 @@ fn normalize(values : Array[Int]) -> Array[Int] {
 }
 
 ///|
-fn union_sorted(left : Array[Int], right : Array[Int]) -> Array[Int] {
-  let output : Array[Int] = []
+fn union_sorted(left : Array[Int32], right : Array[Int32]) -> Array[Int32] {
+  let output : Array[Int32] = []
   let mut a = 0
   let mut b = 0
   while a < left.length() || b < right.length() {
@@ -440,8 +468,11 @@ fn union_sorted(left : Array[Int], right : Array[Int]) -> Array[Int] {
 }
 
 ///|
-fn intersection_sorted(left : Array[Int], right : Array[Int]) -> Array[Int] {
-  let output : Array[Int] = []
+fn intersection_sorted(
+  left : Array[Int32],
+  right : Array[Int32],
+) -> Array[Int32] {
+  let output : Array[Int32] = []
   let mut a = 0
   let mut b = 0
   while a < left.length() && b < right.length() {
@@ -459,8 +490,8 @@ fn intersection_sorted(left : Array[Int], right : Array[Int]) -> Array[Int] {
 }
 
 ///|
-fn difference_sorted(left : Array[Int], right : Array[Int]) -> Array[Int] {
-  let output : Array[Int] = []
+fn difference_sorted(left : Array[Int32], right : Array[Int32]) -> Array[Int32] {
+  let output : Array[Int32] = []
   let mut a = 0
   let mut b = 0
   while a < left.length() {
@@ -584,12 +615,12 @@ fn xor_blocks(
 }
 
 ///|
-fn from_sorted(values : Array[Int]) -> RoaringBitmap {
+fn from_sorted(values : Array[Int32]) -> RoaringBitmap {
   let blocks : Array[RoaringBlock] = []
   let mut index = 0
   while index < values.length() {
     let key = values[index] / block_size
-    let lows : Array[Int] = []
+    let lows : Array[Int32] = []
     while index < values.length() && values[index] / block_size == key {
       lows.push(values[index] % block_size)
       index += 1
@@ -600,7 +631,7 @@ fn from_sorted(values : Array[Int]) -> RoaringBitmap {
 }
 
 ///|
-fn Container::from_lows(lows : Array[Int]) -> Container {
+fn Container::from_lows(lows : Array[Int32]) -> Container {
   let runs = make_runs(lows)
   if lows.length() >= bitmap_threshold {
     BitmapContainer(make_words(lows), lows.length())
@@ -660,11 +691,11 @@ fn Container::xor(self : Container, other : Container) -> Container {
 /// Combine equally-sized dense words and downshift sparse results to a compact
 /// container representation.
 fn combine_bitmap_words(
-  left : Array[Int],
-  right : Array[Int],
+  left : Array[Int32],
+  right : Array[Int32],
   operation : WordOperation,
 ) -> Container {
-  let words : Array[Int] = []
+  let words : Array[Int32] = []
   let mut cardinality = 0
   for index in 0..<word_count {
     let word = match operation {
@@ -685,8 +716,8 @@ fn combine_bitmap_words(
 
 ///|
 /// Expand a word array only after a dense operation became sparse.
-fn bitmap_words_to_lows(words : Array[Int]) -> Array[Int] {
-  let output : Array[Int] = []
+fn bitmap_words_to_lows(words : Array[Int32]) -> Array[Int32] {
+  let output : Array[Int32] = []
   for low in 0..<block_size {
     if (words[low / word_bits] & (1 << (low % word_bits))) != 0 {
       output.push(low)
@@ -696,7 +727,7 @@ fn bitmap_words_to_lows(words : Array[Int]) -> Array[Int] {
 }
 
 ///|
-fn Container::cardinality(self : Container) -> Int {
+fn Container::cardinality(self : Container) -> Int32 {
   match self {
     ArrayContainer(values) => values.length()
     BitmapContainer(_, count) => count
@@ -706,7 +737,7 @@ fn Container::cardinality(self : Container) -> Int {
 
 ///|
 /// Membership in one low-16-bit container.
-fn Container::contains(self : Container, low : Int) -> Bool {
+fn Container::contains(self : Container, low : Int32) -> Bool {
   match self {
     ArrayContainer(values) => values.contains(low)
     BitmapContainer(words, _) =>
@@ -727,7 +758,7 @@ fn Container::contains(self : Container, low : Int) -> Bool {
 
 ///|
 /// Number of container values less than or equal to `low`.
-fn Container::rank(self : Container, low : Int) -> Int {
+fn Container::rank(self : Container, low : Int32) -> Int32 {
   match self {
     ArrayContainer(values) => values.filter(value => value <= low).length()
     BitmapContainer(words, _) => {
@@ -766,7 +797,7 @@ fn Container::rank(self : Container, low : Int) -> Int {
 
 ///|
 /// Select a low value by zero-based index.
-fn Container::select(self : Container, index : Int) -> Int? {
+fn Container::select(self : Container, index : Int32) -> Int32? {
   match self {
     ArrayContainer(values) => Some(values[index])
     BitmapContainer(words, _) => {
@@ -803,7 +834,7 @@ fn Container::select(self : Container, index : Int) -> Int? {
 
 ///|
 /// First low value, if any.
-fn Container::minimum(self : Container) -> Int? {
+fn Container::minimum(self : Container) -> Int32? {
   match self {
     ArrayContainer(values) => Some(values[0])
     BitmapContainer(_, _) => self.select(0)
@@ -813,7 +844,7 @@ fn Container::minimum(self : Container) -> Int? {
 
 ///|
 /// Last low value, if any.
-fn Container::maximum(self : Container) -> Int? {
+fn Container::maximum(self : Container) -> Int32? {
   match self {
     ArrayContainer(values) => Some(values[values.length() - 1])
     BitmapContainer(_, count) => self.select(count - 1)
@@ -823,7 +854,7 @@ fn Container::maximum(self : Container) -> Int? {
 
 ///|
 /// Count set bits without relying on a target-specific unsigned integer API.
-fn count_word_bits(word : Int) -> Int {
+fn count_word_bits(word : Int32) -> Int32 {
   let mut total = 0
   for bit in 0..<word_bits {
     if (word & (1 << bit)) != 0 {
@@ -834,11 +865,11 @@ fn count_word_bits(word : Int) -> Int {
 }
 
 ///|
-fn Container::values(self : Container) -> Array[Int] {
+fn Container::values(self : Container) -> Array[Int32] {
   match self {
     ArrayContainer(values) => values.copy()
     BitmapContainer(words, _) => {
-      let output : Array[Int] = []
+      let output : Array[Int32] = []
       for low in 0..<block_size {
         let word = words[low / word_bits]
         if (word & (1 << (low % word_bits))) != 0 {
@@ -848,7 +879,7 @@ fn Container::values(self : Container) -> Array[Int] {
       output
     }
     RunContainer(runs, _) => {
-      let output : Array[Int] = []
+      let output : Array[Int32] = []
       for run in runs {
         for low in run.start..<=run.end {
           output.push(low)
@@ -860,8 +891,8 @@ fn Container::values(self : Container) -> Array[Int] {
 }
 
 ///|
-fn make_words(lows : Array[Int]) -> Array[Int] {
-  let words : Array[Int] = []
+fn make_words(lows : Array[Int32]) -> Array[Int32] {
+  let words : Array[Int32] = []
   for _ in 0..<word_count {
     words.push(0)
   }
@@ -873,7 +904,7 @@ fn make_words(lows : Array[Int]) -> Array[Int] {
 }
 
 ///|
-fn make_runs(lows : Array[Int]) -> Array[Run] {
+fn make_runs(lows : Array[Int32]) -> Array[Run] {
   let output : Array[Run] = []
   if lows.length() == 0 {
     return output

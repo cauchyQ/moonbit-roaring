@@ -2,23 +2,23 @@
 /// Cursor for ascending traversal without exposing container internals.
 pub struct RoaringCursor {
   bitmap : RoaringBitmap
-  block_index : Int
-  lows : Array[Int]
-  low_index : Int
-  yielded : Int
+  block_index : Int32
+  lows : Array[Int32]
+  low_index : Int32
+  yielded : Int32
 }
 
 ///|
 /// A mutable staging area for bulk ingestion followed by one normalization.
 pub struct RoaringBuilder {
-  values : Array[Int]
+  values : Array[Int32]
 }
 
 ///|
 /// A validated half-open interval used for batch range input and output.
 pub(all) struct IntRange {
-  start : Int
-  end : Int
+  start : Int32
+  end : Int32
 }
 
 ///|
@@ -29,7 +29,7 @@ pub fn RoaringBuilder::new() -> RoaringBuilder {
 
 ///|
 /// Number of values staged, including duplicates that `finish` will normalize.
-pub fn RoaringBuilder::staged_len(self : RoaringBuilder) -> Int {
+pub fn RoaringBuilder::staged_len(self : RoaringBuilder) -> Int32 {
   self.values.length()
 }
 
@@ -37,7 +37,7 @@ pub fn RoaringBuilder::staged_len(self : RoaringBuilder) -> Int {
 /// Stage one non-negative value.
 pub fn RoaringBuilder::push(
   self : RoaringBuilder,
-  value : Int,
+  value : Int32,
 ) -> Result[Unit, RoaringError] {
   if value < 0 {
     return Err(NegativeValue(value))
@@ -50,7 +50,7 @@ pub fn RoaringBuilder::push(
 /// Stage a batch atomically: invalid input appends nothing.
 pub fn RoaringBuilder::push_all(
   self : RoaringBuilder,
-  values : Array[Int],
+  values : Array[Int32],
 ) -> Result[Unit, RoaringError] {
   for value in values {
     if value < 0 {
@@ -67,8 +67,8 @@ pub fn RoaringBuilder::push_all(
 /// Stage a range subject to the normal insertion materialization limit.
 pub fn RoaringBuilder::push_range(
   self : RoaringBuilder,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
 ) -> Result[Unit, RoaringError] {
   if start < 0 || end < start {
     return Err(InvalidRange(start, end))
@@ -92,21 +92,22 @@ pub fn RoaringBuilder::finish(self : RoaringBuilder) -> RoaringBitmap {
 /// Errors for the versioned word encoding.
 pub(all) enum CodecError {
   MissingHeader
-  UnsupportedVersion(Int)
-  InvalidCount(Int)
-  InvalidPayloadLength(Int, Int)
-  InvalidValue(Int)
-  InvalidRunLength(Int)
-  CardinalityMismatch(Int, Int)
-  PayloadTooLarge(Int)
+  UnsupportedVersion(Int32)
+  InvalidCount(Int32)
+  InvalidPayloadLength(Int32, Int32)
+  InvalidValue(Int32)
+  InvalidRunLength(Int32)
+  CardinalityMismatch(Int32, Int32)
+  PayloadTooLarge(Int32)
+  NonIncreasingGeneration(Int32, Int32)
   NonCanonicalPayload
 }
 
 ///|
 /// Construct every value in the validated half-open range.
 pub fn RoaringBitmap::from_range(
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
 ) -> Result[RoaringBitmap, RoaringError] {
   RoaringBitmap::new().add_range(start, end)
 }
@@ -119,7 +120,7 @@ pub fn RoaringBitmap::from_range(
 pub fn RoaringBitmap::from_ranges(
   ranges : Array[IntRange],
 ) -> Result[RoaringBitmap, RoaringError] {
-  let values : Array[Int] = []
+  let values : Array[Int32] = []
   let mut total = 0
   for range in ranges {
     if range.start < 0 || range.end < range.start {
@@ -141,7 +142,7 @@ pub fn RoaringBitmap::from_ranges(
 /// Add a batch atomically: invalid input leaves no partial result exposed.
 pub fn RoaringBitmap::add_all(
   self : RoaringBitmap,
-  values : Array[Int],
+  values : Array[Int32],
 ) -> Result[RoaringBitmap, RoaringError] {
   RoaringBitmap::from_array(self.to_array() + values)
 }
@@ -150,7 +151,7 @@ pub fn RoaringBitmap::add_all(
 /// Remove every listed value; unknown values are ignored.
 pub fn RoaringBitmap::remove_all(
   self : RoaringBitmap,
-  values : Array[Int],
+  values : Array[Int32],
 ) -> Result[RoaringBitmap, RoaringError] {
   match RoaringBitmap::from_array(values) {
     Ok(removed) => Ok(self.difference(removed))
@@ -162,15 +163,33 @@ pub fn RoaringBitmap::remove_all(
 /// Remove every value in the half-open range `[start, end)`.
 pub fn RoaringBitmap::remove_range(
   self : RoaringBitmap,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
 ) -> Result[RoaringBitmap, RoaringError] {
   if start < 0 || end < start {
     return Err(InvalidRange(start, end))
   }
-  Ok(
-    from_sorted(self.to_array().filter(value => value < start || value >= end)),
-  )
+  if start == end {
+    return Ok(self)
+  }
+  let blocks : Array[RoaringBlock] = []
+  for block in self.blocks {
+    let base = block.key * block_size
+    if base >= end || (base <= start && start - base >= block_size) {
+      blocks.push(block)
+    } else {
+      let lows = block.container
+        .values()
+        .filter(low => {
+          let value = base + low
+          value < start || value >= end
+        })
+      if lows.length() > 0 {
+        blocks.push({ key: block.key, container: Container::from_lows(lows), })
+      }
+    }
+  }
+  Ok({ blocks, })
 }
 
 ///|
@@ -215,7 +234,7 @@ fn validate_ranges(ranges : Array[IntRange]) -> Result[Unit, RoaringError] {
 
 ///|
 /// Test whether a stored value belongs to any half-open input interval.
-fn in_any_range(value : Int, ranges : Array[IntRange]) -> Bool {
+fn in_any_range(value : Int32, ranges : Array[IntRange]) -> Bool {
   for range in ranges {
     if range.start <= value && value < range.end {
       return true
@@ -266,7 +285,7 @@ pub fn RoaringBitmap::cursor(self : RoaringBitmap) -> RoaringCursor {
 
 ///|
 /// Return the next value and a successor cursor. The original cursor is unchanged.
-pub fn RoaringCursor::next(self : RoaringCursor) -> (Int?, RoaringCursor) {
+pub fn RoaringCursor::next(self : RoaringCursor) -> (Int32?, RoaringCursor) {
   let mut block_index = self.block_index
   let mut lows = self.lows
   let mut low_index = self.low_index
@@ -301,7 +320,7 @@ pub fn RoaringCursor::next(self : RoaringCursor) -> (Int?, RoaringCursor) {
 
 ///|
 /// Number of values not yet returned by this cursor.
-pub fn RoaringCursor::remaining(self : RoaringCursor) -> Int {
+pub fn RoaringCursor::remaining(self : RoaringCursor) -> Int32 {
   self.bitmap.cardinality() - self.yielded
 }
 
@@ -345,9 +364,9 @@ pub fn xor_all(bitmaps : Array[RoaringBitmap]) -> RoaringBitmap {
 /// Count values in the half-open range without materializing a new bitmap.
 pub fn RoaringBitmap::count_in_range(
   self : RoaringBitmap,
-  start : Int,
-  end : Int,
-) -> Result[Int, RoaringError] {
+  start : Int32,
+  end : Int32,
+) -> Result[Int32, RoaringError] {
   if start < 0 || end < start {
     return Err(InvalidRange(start, end))
   }
@@ -362,8 +381,8 @@ pub fn RoaringBitmap::count_in_range(
 /// Unlike construction, this query never materializes the range.
 pub fn RoaringBitmap::contains_range(
   self : RoaringBitmap,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
 ) -> Result[Bool, RoaringError] {
   if start < 0 || end < start {
     return Err(InvalidRange(start, end))
@@ -378,8 +397,8 @@ pub fn RoaringBitmap::contains_range(
 /// Return the first member greater than or equal to `value`.
 pub fn RoaringBitmap::next_at_or_after(
   self : RoaringBitmap,
-  value : Int,
-) -> Int? {
+  value : Int32,
+) -> Int32? {
   if self.is_empty() {
     return None
   }
@@ -393,8 +412,8 @@ pub fn RoaringBitmap::next_at_or_after(
 /// Return the last member less than or equal to `value`.
 pub fn RoaringBitmap::previous_at_or_before(
   self : RoaringBitmap,
-  value : Int,
-) -> Int? {
+  value : Int32,
+) -> Int32? {
   if value < 0 {
     None
   } else {
@@ -406,13 +425,13 @@ pub fn RoaringBitmap::previous_at_or_before(
 
 ///|
 /// It is intentionally simple and platform-neutral; it is not CRoaring format.
-pub fn RoaringBitmap::encode_words(self : RoaringBitmap) -> Array[Int] {
+pub fn RoaringBitmap::encode_words(self : RoaringBitmap) -> Array[Int32] {
   [1, self.cardinality(), ..self.to_array()]
 }
 
 ///|
 /// Decode and reject malformed or non-canonical word payloads.
-pub fn decode_words(words : Array[Int]) -> Result[RoaringBitmap, CodecError] {
+pub fn decode_words(words : Array[Int32]) -> Result[RoaringBitmap, CodecError] {
   if words.length() == 0 {
     return Err(MissingHeader)
   }
@@ -426,7 +445,7 @@ pub fn decode_words(words : Array[Int]) -> Result[RoaringBitmap, CodecError] {
   if words.length() != count + 2 {
     return Err(InvalidPayloadLength(count, words.length() - 2))
   }
-  let values : Array[Int] = []
+  let values : Array[Int32] = []
   for index in 2..<words.length() {
     if words[index] < 0 {
       return Err(InvalidValue(words[index]))
@@ -452,14 +471,14 @@ pub fn decode_words(words : Array[Int]) -> Result[RoaringBitmap, CodecError] {
 /// prevents a tiny hostile input from requesting an unbounded allocation.
 pub fn RoaringBitmap::encode_run_words(
   self : RoaringBitmap,
-) -> Result[Array[Int], CodecError] {
+) -> Result[Array[Int32], CodecError] {
   let cardinality = self.cardinality()
   if cardinality > max_materialized_range {
     return Err(PayloadTooLarge(cardinality))
   }
   let values = self.to_array()
-  let starts : Array[Int] = []
-  let lengths : Array[Int] = []
+  let starts : Array[Int32] = []
+  let lengths : Array[Int32] = []
   if values.length() > 0 {
     let mut start = values[0]
     let mut previous = start
@@ -475,7 +494,7 @@ pub fn RoaringBitmap::encode_run_words(
     starts.push(start)
     lengths.push(previous - start + 1)
   }
-  let output : Array[Int] = [3, cardinality, starts.length()]
+  let output : Array[Int32] = [3, cardinality, starts.length()]
   for index in 0..<starts.length() {
     output.push(starts[index])
     output.push(lengths[index])
@@ -487,7 +506,7 @@ pub fn RoaringBitmap::encode_run_words(
 /// Decode canonical run words and reject overlaps, adjacency, overflow, and
 /// payloads exceeding the documented safety ceiling.
 pub fn decode_run_words(
-  words : Array[Int],
+  words : Array[Int32],
 ) -> Result[RoaringBitmap, CodecError] {
   if words.length() == 0 {
     return Err(MissingHeader)
@@ -507,7 +526,7 @@ pub fn decode_run_words(
   if payload_length % 2 != 0 || run_count != payload_length / 2 {
     return Err(InvalidPayloadLength(run_count * 2, payload_length))
   }
-  let values : Array[Int] = []
+  let values : Array[Int32] = []
   let mut total = 0
   let mut previous_end = -1
   for index in 0..<run_count {

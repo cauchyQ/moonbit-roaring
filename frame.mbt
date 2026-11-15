@@ -2,15 +2,15 @@
 /// A self-checking stable word frame around a supported codec payload.
 pub(all) struct BitmapFrame {
   format : CodecFormat
-  payload : Array[Int]
-  checksum : Int
+  payload : Array[Int32]
+  checksum : Int32
 }
 
 ///|
 /// Errors for framed transport validation.
 pub(all) enum FrameError {
   Codec(CodecError)
-  ChecksumMismatch(Int, Int)
+  ChecksumMismatch(Int32, Int32)
 }
 
 ///|
@@ -44,14 +44,14 @@ pub fn BitmapFrame::decode(
 /// Replace a frame payload for corruption-testing or transport adapters.
 pub fn BitmapFrame::with_payload(
   self : BitmapFrame,
-  payload : Array[Int],
+  payload : Array[Int32],
 ) -> BitmapFrame {
   { format: self.format, checksum: self.checksum, payload, }
 }
 
 ///|
 /// A target-independent bounded checksum; it is corruption detection, not cryptography.
-fn frame_checksum(words : Array[Int]) -> Int {
+fn frame_checksum(words : Array[Int32]) -> Int32 {
   let mut total = 17
   for word in words {
     let part = if word < 0 { -word % 1_000_003 } else { word % 1_000_003 }

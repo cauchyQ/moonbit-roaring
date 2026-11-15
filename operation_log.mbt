@@ -1,12 +1,12 @@
 ///|
 /// A replayable immutable bitmap operation.
 pub(all) enum BitmapOperation {
-  Add(Int)
-  Remove(Int)
-  AddRange(Int, Int)
-  RemoveRange(Int, Int)
-  AddAll(Array[Int])
-  RemoveAll(Array[Int])
+  Add(Int32)
+  Remove(Int32)
+  AddRange(Int32, Int32)
+  RemoveRange(Int32, Int32)
+  AddAll(Array[Int32])
+  RemoveAll(Array[Int32])
 }
 
 ///|
@@ -36,7 +36,7 @@ pub fn RoaringOperationLog::new(
 
 ///|
 /// Number of unapplied operations.
-pub fn RoaringOperationLog::len(self : RoaringOperationLog) -> Int {
+pub fn RoaringOperationLog::len(self : RoaringOperationLog) -> Int32 {
   self.operations.length()
 }
 

@@ -37,13 +37,13 @@ pub fn RoaringPatch::touched(self : RoaringPatch) -> RoaringBitmap {
 
 ///|
 /// Number of values added by this patch.
-pub fn RoaringPatch::added_cardinality(self : RoaringPatch) -> Int {
+pub fn RoaringPatch::added_cardinality(self : RoaringPatch) -> Int32 {
   self.additions.cardinality()
 }
 
 ///|
 /// Number of values removed by this patch.
-pub fn RoaringPatch::removed_cardinality(self : RoaringPatch) -> Int {
+pub fn RoaringPatch::removed_cardinality(self : RoaringPatch) -> Int32 {
   self.removals.cardinality()
 }
 

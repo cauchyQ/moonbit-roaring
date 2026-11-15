@@ -1,7 +1,7 @@
 ///|
 /// Reproducible workload fixtures used by `moon bench --release`.
 fn benchmark_left() -> RoaringBitmap {
-  let values : Array[Int] = []
+  let values : Array[Int32] = []
   for value in 0..<6_000 {
     values.push(value * 3)
   }
@@ -10,7 +10,7 @@ fn benchmark_left() -> RoaringBitmap {
 
 ///|
 fn benchmark_right() -> RoaringBitmap {
-  let values : Array[Int] = []
+  let values : Array[Int32] = []
   for value in 0..<6_000 {
     values.push(value * 5 + 1)
   }
@@ -35,4 +35,13 @@ test (b : @bench.T) {
   })
   b.bench(name="rank_dense_bitmap", fn() { b.keep(left.rank(12_345)) })
   b.bench(name="select_dense_bitmap", fn() { b.keep(left.select(4_000)) })
+  b.bench(name="search_filter_intersection", fn() {
+    b.keep(left.intersection(right).cardinality())
+  })
+  b.bench(name="permission_union_exclusion", fn() {
+    b.keep(left.union(right).difference(right).cardinality())
+  })
+  b.bench(name="analytics_cohort_overlap", fn() {
+    b.keep(left.intersection(right).cardinality())
+  })
 }

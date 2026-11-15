@@ -386,6 +386,26 @@ test "patch envelopes enforce generation ordering and checked reconstruction" {
   assert_true(
     stale.apply_patch_envelope(envelope) is Err(StaleGeneration(4, 3)),
   )
+  let wrong_base = @moonbit-roaring.RoaringSnapshot::at(
+    3,
+    @moonbit-roaring.RoaringBitmap::from_array([1, 2, 6]).unwrap(),
+  ).unwrap()
+  assert_true(
+    wrong_base.apply_patch_envelope(envelope) is Err(BaselineMismatch(_, _)),
+  )
+  // These sets have the same cardinality and sum, so the old checksum collides.
+  let collision = @moonbit-roaring.RoaringSnapshot::at(
+    3,
+    @moonbit-roaring.RoaringBitmap::from_array([0, 3, 5]).unwrap(),
+  ).unwrap()
+  assert_true(
+    collision.apply_patch_envelope(envelope) is Err(BaselineMismatch(_, _)),
+  )
+  let same_generation = @moonbit-roaring.RoaringSnapshot::at(3, target.bitmap()).unwrap()
+  assert_true(
+    base.patch_envelope(same_generation, PlainWords)
+    is Err(NonIncreasingGeneration(3, 3)),
+  )
 }
 
 ///|

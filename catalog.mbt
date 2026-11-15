@@ -1,7 +1,7 @@
 ///|
 /// One numeric label and the bitmap indexed by that label.
 pub(all) struct BitmapEntry {
-  key : Int
+  key : Int32
   bitmap : RoaringBitmap
 }
 
@@ -14,11 +14,11 @@ pub struct BitmapCatalog {
 ///|
 /// Boolean expression evaluated against a catalog and an explicit universe.
 pub(all) enum CatalogQuery {
-  Key(Int)
+  Key(Int32)
   Any(Array[CatalogQuery])
   All(Array[CatalogQuery])
   Not(CatalogQuery)
-  AtLeast(Int, Array[CatalogQuery])
+  AtLeast(Int32, Array[CatalogQuery])
 }
 
 ///|
@@ -27,7 +27,7 @@ pub fn BitmapCatalog::new() -> BitmapCatalog {
 }
 
 ///|
-pub fn BitmapCatalog::get(self : BitmapCatalog, key : Int) -> RoaringBitmap? {
+pub fn BitmapCatalog::get(self : BitmapCatalog, key : Int32) -> RoaringBitmap? {
   for entry in self.entries {
     if entry.key == key {
       return Some(entry.bitmap)
@@ -39,7 +39,7 @@ pub fn BitmapCatalog::get(self : BitmapCatalog, key : Int) -> RoaringBitmap? {
 ///|
 pub fn BitmapCatalog::upsert(
   self : BitmapCatalog,
-  key : Int,
+  key : Int32,
   bitmap : RoaringBitmap,
 ) -> BitmapCatalog {
   let entries : Array[BitmapEntry] = []
@@ -60,14 +60,17 @@ pub fn BitmapCatalog::upsert(
 }
 
 ///|
-pub fn BitmapCatalog::remove(self : BitmapCatalog, key : Int) -> BitmapCatalog {
+pub fn BitmapCatalog::remove(
+  self : BitmapCatalog,
+  key : Int32,
+) -> BitmapCatalog {
   { entries: self.entries.filter(entry => entry.key != key), }
 }
 
 ///|
 /// Keys in deterministic ascending order.
-pub fn BitmapCatalog::keys(self : BitmapCatalog) -> Array[Int] {
-  let output : Array[Int] = []
+pub fn BitmapCatalog::keys(self : BitmapCatalog) -> Array[Int32] {
+  let output : Array[Int32] = []
   for entry in self.entries {
     output.push(entry.key)
   }
@@ -76,16 +79,16 @@ pub fn BitmapCatalog::keys(self : BitmapCatalog) -> Array[Int] {
 
 ///|
 /// Number of indexed labels.
-pub fn BitmapCatalog::len(self : BitmapCatalog) -> Int {
+pub fn BitmapCatalog::len(self : BitmapCatalog) -> Int32 {
   self.entries.length()
 }
 
 ///|
 /// Static query metadata available without evaluating bitmap operands.
 pub(all) struct CatalogQueryStats {
-  nodes : Int
-  depth : Int
-  key_references : Int
+  nodes : Int32
+  depth : Int32
+  key_references : Int32
 }
 
 ///|
@@ -120,12 +123,12 @@ pub fn CatalogQuery::stats(self : CatalogQuery) -> CatalogQueryStats {
 
 ///|
 /// Collect keys in deterministic depth-first order, retaining repeats.
-pub fn CatalogQuery::referenced_keys(self : CatalogQuery) -> Array[Int] {
+pub fn CatalogQuery::referenced_keys(self : CatalogQuery) -> Array[Int32] {
   match self {
     Key(key) => [key]
     Not(child) => child.referenced_keys()
     Any(children) | All(children) | AtLeast(_, children) => {
-      let output : Array[Int] = []
+      let output : Array[Int32] = []
       for child in children {
         for key in child.referenced_keys() {
           output.push(key)
@@ -140,7 +143,7 @@ pub fn CatalogQuery::referenced_keys(self : CatalogQuery) -> Array[Int] {
 /// Evaluation output paired with catalog keys that were absent at lookup time.
 pub(all) struct CatalogQueryResult {
   bitmap : RoaringBitmap
-  missing_keys : Array[Int]
+  missing_keys : Array[Int32]
 }
 
 ///|
@@ -150,7 +153,7 @@ pub fn BitmapCatalog::evaluate_traced(
   query : CatalogQuery,
   universe : RoaringBitmap,
 ) -> CatalogQueryResult {
-  let missing : Array[Int] = []
+  let missing : Array[Int32] = []
   for key in query.referenced_keys() {
     if self.get(key) is None && !missing.contains(key) {
       missing.push(key)
@@ -186,14 +189,14 @@ pub fn BitmapCatalog::evaluate(
       if threshold <= 0 {
         return universe
       }
-      let values : Array[Int] = []
+      let values : Array[Int32] = []
       for child in children {
         for value in self.evaluate(child, universe).to_array() {
           values.push(value)
         }
       }
       values.sort()
-      let out : Array[Int] = []
+      let out : Array[Int32] = []
       let mut index = 0
       while index < values.length() {
         let value = values[index]

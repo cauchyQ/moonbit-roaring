@@ -1,12 +1,12 @@
 ///|
 /// Aggregate facts about a batch of bitmap operands.
 pub(all) struct BitmapBatchReport {
-  operand_count : Int
-  total_cardinality : Int
-  union_cardinality : Int
-  intersection_cardinality : Int
-  duplicate_occurrences : Int
-  empty_operands : Int
+  operand_count : Int32
+  total_cardinality : Int32
+  union_cardinality : Int32
+  intersection_cardinality : Int32
+  duplicate_occurrences : Int32
+  empty_operands : Int32
 }
 
 ///|
@@ -39,7 +39,7 @@ pub fn analyze_batch(bitmaps : Array[RoaringBitmap]) -> BitmapBatchReport {
 /// Threshold zero returns the union because no external universe is supplied.
 pub fn values_at_least(
   bitmaps : Array[RoaringBitmap],
-  threshold : Int,
+  threshold : Int32,
 ) -> RoaringBitmap {
   if threshold <= 0 {
     return union_all(bitmaps)
@@ -47,14 +47,14 @@ pub fn values_at_least(
   if threshold > bitmaps.length() {
     return RoaringBitmap::new()
   }
-  let values : Array[Int] = []
+  let values : Array[Int32] = []
   for bitmap in bitmaps {
     for value in bitmap.to_array() {
       values.push(value)
     }
   }
   values.sort()
-  let output : Array[Int] = []
+  let output : Array[Int32] = []
   let mut index = 0
   while index < values.length() {
     let value = values[index]
@@ -73,14 +73,14 @@ pub fn values_at_least(
 ///|
 /// Return values present in exactly one operand.
 pub fn values_in_exactly_one(bitmaps : Array[RoaringBitmap]) -> RoaringBitmap {
-  let values : Array[Int] = []
+  let values : Array[Int32] = []
   for bitmap in bitmaps {
     for value in bitmap.to_array() {
       values.push(value)
     }
   }
   values.sort()
-  let output : Array[Int] = []
+  let output : Array[Int32] = []
   let mut index = 0
   while index < values.length() {
     let value = values[index]
@@ -98,8 +98,8 @@ pub fn values_in_exactly_one(bitmaps : Array[RoaringBitmap]) -> RoaringBitmap {
 
 ///|
 /// Return each operand's overlap count with the union of all other operands.
-pub fn overlap_with_others(bitmaps : Array[RoaringBitmap]) -> Array[Int] {
-  let output : Array[Int] = []
+pub fn overlap_with_others(bitmaps : Array[RoaringBitmap]) -> Array[Int32] {
+  let output : Array[Int32] = []
   for index in 0..<bitmaps.length() {
     let others : Array[RoaringBitmap] = []
     for other_index in 0..<bitmaps.length() {
