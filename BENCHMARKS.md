@@ -17,7 +17,7 @@ This is a local microbenchmark, not an end-to-end application, comparison with
 other libraries, memory measurement, or a claim of speedup. The workload does
 not measure portable encoding, incremental transfer, or checksum costs.
 
-## Full versus incremental refresh
+## Full versus incremental refresh (prior no-Run baseline)
 
 Actual run: `moon bench --release --deny-warn`, same compiler and Wasm target.
 Fixture: IDs [0,10000) plus UInt32 max; target deletes [100,110) and adds
@@ -39,5 +39,21 @@ because both baseline and reconstructed target are hashed. Choose a full
 refresh when CPU cost dominates. No network latency, process startup or disk
 I/O is included. No runtime heap-memory measurement was performed.
 
-Raw output, including standard deviations and sample counts, is retained in
-`scenario-benchmark-output.txt`. Correctness is checked before timed loops.
+This baseline uses the old no-Run encoding. It should not be compared with
+Run-optimized competitors. The current comparison below supersedes it.
+
+## Run-optimized full versus incremental refresh
+
+Windows, MoonBit v0.10.19+bee578715, Wasm release. The same 10,001-ID fixture
+and 20-member change are used for each scenario; search and analytics both use
+intersection. Timings are means of ten batches and include hashing for delta.
+
+| Scenario | Full receive + query | Delta receive + query | Full production | Delta production |
+| --- | ---: | ---: | ---: | ---: |
+| Search | 354.43 µs | 1.61 ms | 250.86 µs | 1.31 ms |
+| Permissions | 296.64 µs | 1.63 ms | 248.72 µs | 1.31 ms |
+| Analytics | 294.97 µs | 1.59 ms | 251.28 µs | 1.27 ms |
+
+The Run-encoded full snapshot is 29 bytes; the delta is 196 bytes. Full
+refresh is smaller and faster for this input. These measurements omit network,
+disk and actual heap-memory costs and are not a comparison with another library.

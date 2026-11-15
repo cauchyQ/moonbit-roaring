@@ -15,7 +15,7 @@ test (b : @bench.T) {
     let target = UInt32Snapshot::new(name, 2UL, target_bitmap)
     let filter = UInt32Bitmap::new().add_range(0UL, 5000UL).unwrap()
     let patch = base.diff_to(target).unwrap().serialize()
-    let full = target_bitmap.serialize_portable().unwrap()
+    let full = target_bitmap.serialize_portable_compact()
     let reconstructed = base
       .apply(decode_uint32_patch(patch, name).unwrap())
       .unwrap()
@@ -41,7 +41,7 @@ test (b : @bench.T) {
       b.keep(result.cardinality())
     })
     b.bench(name=name + "_produce_full", fn() {
-      b.keep(target_bitmap.serialize_portable().unwrap().length())
+      b.keep(target_bitmap.serialize_portable_compact().length())
     })
     b.bench(name=name + "_produce_delta_with_hashes", fn() {
       b.keep(base.diff_to(target).unwrap().serialize().length())

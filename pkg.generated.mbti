@@ -424,6 +424,7 @@ pub fn UInt32Bitmap::remove(Self, UInt32) -> Self
 pub fn UInt32Bitmap::remove_range(Self, UInt64, UInt64) -> Result[Self, String]
 pub fn UInt32Bitmap::select(Self, UInt64) -> UInt32?
 pub fn UInt32Bitmap::serialize_portable(Self) -> Result[Bytes, String]
+pub fn UInt32Bitmap::serialize_portable_compact(Self) -> Bytes
 pub fn UInt32Bitmap::union(Self, Self) -> Self
 pub fn UInt32Bitmap::xor(Self, Self) -> Self
 

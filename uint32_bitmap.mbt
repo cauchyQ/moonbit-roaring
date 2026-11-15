@@ -252,6 +252,90 @@ pub fn UInt32Bitmap::serialize_portable(
 }
 
 ///|
+/// Portable encoding with Run containers where they reduce encoded size.
+/// The no-run writer remains the canonical representation for URP1 digests.
+pub fn UInt32Bitmap::serialize_portable_compact(self : UInt32Bitmap) -> Bytes {
+  let blocks : Array[RoaringBlock] = []
+  let runs_by_block : Array[Array[Run]] = []
+  let run_flags : Array[Bool] = []
+  let mut any_run = false
+  for shard in 0..<4 {
+    for block in self.shards[shard].blocks {
+      blocks.push({
+        key: shard * 16384 + block.key,
+        container: block.container,
+      })
+      let lows = block.container.values()
+      let runs = make_runs(lows)
+      let ordinary_size = if lows.length() <= 4096 {
+        lows.length() * 2
+      } else {
+        8192
+      }
+      let use_run = 2 + runs.length() * 4 < ordinary_size
+      runs_by_block.push(runs)
+      run_flags.push(use_run)
+      any_run = any_run || use_run
+    }
+  }
+  if !any_run {
+    return self.serialize_portable().unwrap()
+  }
+  let size = blocks.length()
+  let buf = @buffer.Buffer::Buffer()
+  buf.write_uint_le(12347U | ((size - 1).reinterpret_as_uint() << 16))
+  for byte_index in 0..<((size + 7) / 8) {
+    let mut flag = 0
+    for bit in 0..<8 {
+      let index = byte_index * 8 + bit
+      if index < size && run_flags[index] {
+        flag = flag | (1 << bit)
+      }
+    }
+    buf.write_byte(flag.to_byte())
+  }
+  for block in blocks {
+    buf.write_uint16_le(block.key.to_uint16())
+    buf.write_uint16_le((block.container.cardinality() - 1).to_uint16())
+  }
+  if size >= 4 {
+    let mut offset = 4 + (size + 7) / 8 + size * 8
+    for i in 0..<size {
+      buf.write_int_le(offset)
+      let count = blocks[i].container.cardinality()
+      offset += if run_flags[i] {
+        2 + runs_by_block[i].length() * 4
+      } else if count <= 4096 {
+        count * 2
+      } else {
+        8192
+      }
+    }
+  }
+  for i in 0..<size {
+    if run_flags[i] {
+      buf.write_uint16_le(runs_by_block[i].length().to_uint16())
+      for run in runs_by_block[i] {
+        buf.write_uint16_le(run.start.to_uint16())
+        buf.write_uint16_le((run.end - run.start).to_uint16())
+      }
+    } else {
+      let lows = blocks[i].container.values()
+      if lows.length() <= 4096 {
+        for low in lows {
+          buf.write_uint16_le(low.to_uint16())
+        }
+      } else {
+        for word in make_words(lows) {
+          buf.write_int_le(word)
+        }
+      }
+    }
+  }
+  buf.to_bytes()
+}
+
+///|
 /// Read portable data with a bounded per-container conversion buffer.
 pub fn decode_portable_uint32(bytes : Bytes) -> Result[UInt32Bitmap, String] {
   let bitmap = match @portable.RoaringBitmap::deserialize(bytes) {
