@@ -233,9 +233,26 @@ pub fn RoaringBitmap::add(
   if !valid_value(value) {
     return Err(NegativeValue(value))
   }
-  let values = self.to_array()
-  values.push(value)
-  Ok(from_sorted(normalize(values)))
+  let key = value / block_size
+  let low = value % block_size
+  let mut index = 0
+  while index < self.blocks.length() && self.blocks[index].key < key {
+    index += 1
+  }
+  let blocks = self.blocks.copy()
+  if index < blocks.length() && blocks[index].key == key {
+    let block = blocks[index]
+    if block.container.contains(low) {
+      return Ok(self)
+    }
+    let lows = block.container.values()
+    lows.push(low)
+    lows.sort()
+    blocks[index] = { key, container: Container::from_lows(lows), }
+  } else {
+    blocks.insert(index, { key, container: Container::from_lows([low]), })
+  }
+  Ok({ blocks, })
 }
 
 ///|
@@ -244,7 +261,30 @@ pub fn RoaringBitmap::remove(
   self : RoaringBitmap,
   value : Int,
 ) -> RoaringBitmap {
-  from_sorted(self.to_array().filter(item => item != value))
+  if !valid_value(value) {
+    return self
+  }
+  let key = value / block_size
+  let low = value % block_size
+  let mut index = 0
+  while index < self.blocks.length() && self.blocks[index].key < key {
+    index += 1
+  }
+  if index == self.blocks.length() || self.blocks[index].key != key {
+    return self
+  }
+  let block = self.blocks[index]
+  if !block.container.contains(low) {
+    return self
+  }
+  let remaining = block.container.values().filter(item => item != low)
+  let blocks = self.blocks.copy()
+  if remaining.length() == 0 {
+    ignore(blocks.remove(index))
+  } else {
+    blocks[index] = { key, container: Container::from_lows(remaining), }
+  }
+  { blocks, }
 }
 
 ///|
