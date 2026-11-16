@@ -112,3 +112,45 @@ test "portable encoding exceeds the former million member limit" {
   assert_eq(restored.cardinality(), 1000001UL)
   assert_eq(restored.select(1000000UL), Some(1000000U))
 }
+
+///|
+test "every truncated portable and patch prefix is rejected" {
+  let original = @moonbit-roaring.UInt32Bitmap::new()
+    .add_range(0UL, 6000UL)
+    .unwrap()
+    .add(4294967295U)
+  let bytes = original.serialize_portable_compact()
+  for i in 0..<bytes.length() {
+    assert_true(
+      @moonbit-roaring.decode_portable_uint32(bytes[0:i].to_owned()) is Err(_),
+    )
+  }
+  let base = @moonbit-roaring.UInt32Snapshot::new("stress", 1UL, original)
+  let target = @moonbit-roaring.UInt32Snapshot::new(
+    "stress",
+    2UL,
+    original.add(70000U),
+  )
+  let patch = base.diff_to(target).unwrap().serialize()
+  for i in 0..<patch.length() {
+    assert_true(
+      @moonbit-roaring.decode_uint32_patch(patch[0:i].to_owned(), "stress")
+      is Err(_),
+    )
+  }
+}
+
+///|
+test "large range crosses every unsigned shard and survives portable roundtrip" {
+  let mut bitmap = @moonbit-roaring.UInt32Bitmap::new()
+  for start in [0UL, 1073741824UL, 2147483648UL, 3221225472UL] {
+    bitmap = bitmap.add_range(start, start + 1000001UL).unwrap()
+  }
+  bitmap = bitmap.add(4294967295U)
+  assert_eq(bitmap.cardinality(), 4000005UL)
+  assert_eq(bitmap.select(4000004UL), Some(4294967295U))
+  let wire = bitmap.serialize_portable_compact()
+  let restored = @moonbit-roaring.decode_portable_uint32(wire).unwrap()
+  assert_eq(restored.xor(bitmap).cardinality(), 0UL)
+  assert_eq(restored.rank(2147483648U), 2000003UL)
+}

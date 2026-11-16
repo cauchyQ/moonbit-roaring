@@ -21,6 +21,10 @@ jobs:
         run: moon test --deny-warn
       - name: Test release
         run: moon test --release --deny-warn
+      - name: Test JavaScript and Wasm GC
+        run: |
+          moon test --target js --deny-warn
+          moon test --target wasm-gc --deny-warn
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
