@@ -1,26 +1,20 @@
 # MoonBit Roaring
 
-MoonBit Roaring is a pure-MoonBit compressed integer-set library. It partitions
-non-negative `Int` values by their high 16 bits and represents each partition
-as a sorted array, a fixed bitmap, or consecutive runs. It is an index data
-structure, not a database, search engine, or permission service.
+MoonBit Roaring 是用 MoonBit 编写的压缩整数集合库。它按高 16 位分块，用数组、位图或连续区间存储数据，供搜索过滤、权限集合和人群分析使用。
 
-## Why
+## 项目用途
 
-Search filters, access-control sets, and analytical cohorts repeatedly need
-union, intersection, difference, rank, and select over integer identifiers.
-A plain `Array[Int]` wastes work for dense values; a flat bitset wastes memory
-for sparse values. Roaring-style containers choose a representation per block.
+这些场景经常需要对整数 ID 求交、并、差以及进行排序位置查询。Roaring 按分块选择存储形式，以适应不同的数据分布。
 
-## Use
+## 安装与使用
 
-Add the published library to your MoonBit project:
+在 MoonBit 项目中添加已发布的库：
 
 ```sh
 moon add cauchyQ/moonbit-roaring@0.3.0
 ```
 
-Import `"cauchyQ/moonbit-roaring" @roaring` in your `moon.pkg`.
+在 `moon.pkg` 中导入 `"cauchyQ/moonbit-roaring" @roaring`：
 
 ```moonbit
 let left = @roaring.RoaringBitmap::from_array([1, 2, 3, 70_000]).unwrap()
@@ -28,7 +22,7 @@ let right = @roaring.RoaringBitmap::from_array([2, 3, 80_000]).unwrap()
 assert_eq(left.intersection(right).to_array(), [2, 3])
 ```
 
-Run checks and the example:
+运行检查和示例：
 
 ```text
 moon check --deny-warn
@@ -38,54 +32,16 @@ moon run cmd/main
 moon run cmd/scenarios
 ```
 
-The scenarios command checks search intersection, inherited permissions with
-denial, cohort overlap, high-bit IDs, patch baseline rejection and portable
-snapshot recovery. It also generates a reproducible 10,000-ID sparse index,
-removes 100 IDs, checks patch replay and full snapshot recovery. Expected
-counts are 2, 2 and 2, version 2, then 9,900 remaining IDs.
+场景示例检查搜索交集、继承权限与拒绝规则、人群交集、高位 ID、错误基线拒绝和 portable 快照恢复。示例还生成 10,000 个稀疏 ID，删除 100 个并验证补丁及快照恢复；预期剩余 9,900 个 ID。
 
-## Implemented API boundaries
+## 接口与边界
 
-- `from_range`, `add_range`, and `remove_range` use half-open ranges and reject
-  negative and inverted endpoints. Constructing or adding a range longer than
-  1,000,000 values is rejected because it materializes new members; removing a
-  range has no such cap because it only scans members already stored.
-- `add_all` and `remove_all` validate a whole batch before returning a new,
-  immutable bitmap; invalid input returns an error rather than silently
-  changing the batch.
-- `from_ranges`, `add_ranges`, and `remove_ranges` accept batches of half-open
-  intervals and normalize overlap. `to_ranges` returns a canonical interval
-  cover; it explicitly rejects the unrepresentable half-open endpoint after
-  the maximum `Int`.
-- `cursor().next()` traverses values in ascending order without exposing the
-  internal container representation, loading one container at a time rather
-  than copying the complete bitmap at cursor creation.
-- `union_all`, `intersection_all`, and `xor_all` aggregate an array of bitmap
-  operands with explicit empty-input identities, for multi-filter queries.
-- `RoaringBuilder` stages validated values, batches, and bounded inserted
-  ranges, then performs one normalization at `finish`; this is the preferred
-  ingestion path when values arrive incrementally.
-- `encode_words` and `decode_words` implement a deterministic, versioned word
-  encoding: `[1, cardinality, ..strictly_ascending_values]`. The decoder
-  rejects bad versions, incorrect lengths, negative values, duplicates, and
-  non-canonical order. This is deliberately *not* CRoaring binary format.
-- `encode_run_words` and `decode_run_words` provide a second deterministic
-  format for interval-heavy data: `[3, cardinality, run_count, start, length,
-  ...]`. Decoding is bounded to 1,000,000 materialized members and rejects
-  overflow, overlap, and adjacent runs that would be non-canonical.
-- Union, intersection, difference, and xor merge high-16-bit blocks first and
-  dispatch matching keys to container-local operations. When both containers
-  are dense bitmaps, the operation runs word-wise and downshifts a sparse
-  result back to Array/Run storage.
-- Point membership, extrema, `rank`, and `select` stay at block/container
-  level. `contains_range`, `next_at_or_after`, and `previous_at_or_before`
-  build range and navigation queries from those primitives without allocating
-  a temporary range bitmap.
-- `stats` and `block_stats` expose cardinality and selected container kinds for
-  diagnostics, without exposing mutable container storage.
-- `diff_to` produces an immutable `RoaringPatch` containing additions and
-  removals. A patch can be applied, inverted, and inspected for the values it
-  touches, which supports incremental index and cache updates.
+- `RoaringBitmap` 的 `from_range`、`add_range`、`remove_range` 使用半开区间。单次构造或添加超过 1,000,000 个元素会返回错误；删除范围没有这一限制。`to_ranges` 会拒绝无法表示的最大 `Int` 后继端点。
+- `add_all`、`remove_all` 先校验完整批次；`from_ranges`、`add_ranges`、`remove_ranges` 接受区间批次并处理重叠。
+- `cursor().next()` 按升序逐容器读取；`RoaringBuilder` 暂存值、批次和有界范围，在 `finish` 时统一构建。`union_all`、`intersection_all` 和 `xor_all` 支持多位图运算。
+- `encode_words`／`decode_words` 是本库带版本的整数词格式；`encode_run_words`／`decode_run_words` 面向连续区间，解码最多展开 1,000,000 个元素。这两种格式不是 CRoaring 二进制格式。
+- 交、并、差和异或先按高位块归并；点查询、极值、`rank`、`select` 和范围导航在块或容器层处理。`stats`、`block_stats` 提供只读统计。
+- `diff_to` 可生成包含新增和删除集合的不可变 `RoaringPatch`，支持应用、反转和检查变更值。
 
 ## 日志与回放：0.2.0 修复说明
 
@@ -115,54 +71,24 @@ counts are 2, 2 and 2, version 2, then 9,900 remaining IDs.
 非法批次、无效前缀、历史统计和编码往返。全部测试在普通及 Release 模式下运行。
 CI 固定编译器 `v0.10.19+bee578715`。
 
-The test suite includes fixed boundary tests plus a deterministic 64-case
-property corpus covering commutativity, idempotence, cancellation, and
-encode/decode round trips. `roaring_bench.mbt` contains reproducible dense
-block workloads for `moon bench`; its numbers are measurements for the local
-toolchain and machine, not portable performance claims.
+测试包括边界检查和确定性的 64 组性质用例，覆盖交换律、幂等性、抵消及编码往返。`roaring_bench.mbt` 提供可复现的稠密块基准；结果反映本机和工具链，不能视作跨机器性能承诺。
 
-## Scope and provenance
+## 互操作与项目来源
 
-The `serialize_portable` and `decode_portable` APIs use
-[`xcc-ordinary/moonbit-roaring` 0.1.0](https://github.com/xcc-ordinary/moonbit-roaring),
-an Apache-2.0 dependency, for Roaring portable encoding. The adapter currently
-accepts only values in the existing non-negative `Int` domain and rejects
-portable inputs containing higher unsigned values. Conversion materializes
-the members; it is not a streaming codec. A fixed sparse fixture generated by
-pyroaring 1.2.0 (which uses CRoaring) is checked in `portable_test.mbt`;
-additional cross-language cases are exercised by the verification script.
+原有 `RoaringBitmap` 的 portable 适配器使用 [`xcc-ordinary/moonbit-roaring` 0.1.0](https://github.com/xcc-ordinary/moonbit-roaring)（Apache-2.0）。该适配器只接受非负 `Int` 范围，转换时会展开元素；`portable_test.mbt` 包含由 CRoaring 的 Python 绑定生成的固定样本。
 
-Run `python verify_croaring.py` with `pyroaring==1.2.0` to validate MoonBit
-portable output using the independent CRoaring reader (10,002 members,
-including unsigned high-bit IDs). The inverse direction uses the fixed
-CRoaring fixtures in `portable_test.mbt` and `uint32_bitmap_test.mbt`.
+安装 `pyroaring==1.2.0` 后运行 `python verify_croaring.py`，可用 CRoaring 读取 MoonBit 输出；反向测试使用 CRoaring 生成的样本。
 
-`UInt32Bitmap` provides an experimental unsigned API with four independent
-shards and a UInt64 cardinality. Its portable writer processes individual
-containers; conversion buffers hold at most 65,536 members. The former
-one-million-member codec limit has been removed and a 1,000,001-member round
-trip is covered by a regression test. The unsigned API
-supports half-open UInt64 ranges including the endpoint 2^32. `UInt32Snapshot`
-provides a checked patch using dataset name, generation and SHA-256 content
-digests. `UInt32SnapshotPatch::serialize` writes the versioned `URP1` wire
-format containing two portable bitmap deltas, without retaining complete
-baseline or target bitmaps. `decode_uint32_patch` validates framing and dataset.
-The unsigned API does not yet offer the journal interface.
+`UInt32Bitmap` 提供无符号接口，使用四个分区和 UInt64 基数；支持半开 UInt64 区间，终点可为 `2^32`。portable 编码按容器处理，转换缓冲区最多容纳一个 65,536 元素的容器；已有 1,000,001 个元素的往返测试。完整 `2^32` 集合尚未完成压力测试，无符号接口尚未提供日志功能。
 
-Run `moon bench --release --deny-warn` for full versus incremental refresh
-comparisons including digest costs; see [BENCHMARKS.md](BENCHMARKS.md).
+`UInt32Snapshot` 使用数据集名称、版本和 SHA-256 内容摘要校验补丁。`UInt32SnapshotPatch::serialize` 输出版本化的 `URP1` 格式，包含新增和删除位图；`decode_uint32_patch` 验证帧结构和数据集。格式说明见 [PATCH_FORMAT.md](PATCH_FORMAT.md)。
 
-This is an independent MoonBit implementation inspired by the Roaring Bitmap
-data-structure family and the public design of CRoaring. Independently generated
-CRoaring fixtures test interoperability. No CRoaring source, SIMD routine or
-API is copied here. CRoaring is
-Apache-2.0 licensed; see <https://github.com/RoaringBitmap/CRoaring>.
+运行 `moon bench --release --deny-warn` 可对比全量与增量更新（包括摘要成本）；结果见 [BENCHMARKS.md](BENCHMARKS.md)，同类库对照见 [COMPARISON.md](COMPARISON.md)。
 
-The original API accepts non-negative `Int` values. `UInt32Bitmap` supports
-unsigned values; cross-target boundary coverage remains to be verified.
-`serialize_portable_compact()` emits Run containers where they reduce encoded
-size. `serialize_portable()` remains the canonical encoding for URP1 digests.
+本项目参考 Roaring Bitmap 和 [CRoaring](https://github.com/RoaringBitmap/CRoaring) 的公开设计，并使用独立生成的 CRoaring 样本验证互操作。CRoaring 采用 Apache-2.0 许可证。
 
-## License
+原有接口接受非负 `Int`；`UInt32Bitmap` 支持无符号值。`serialize_portable_compact()` 在有利时输出 Run 容器；`serialize_portable()` 保留无 Run 的规范编码，供 URP1 摘要使用。CI 覆盖 Wasm、Wasm GC 和 JavaScript；Native 后端尚未在 CI 中验证。
 
-Apache-2.0; the complete text is in [LICENSE](LICENSE).
+## 许可证
+
+Apache-2.0，完整文本见 [LICENSE](LICENSE)。
