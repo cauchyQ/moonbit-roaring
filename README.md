@@ -17,7 +17,7 @@ for sparse values. Roaring-style containers choose a representation per block.
 Add the published library to your MoonBit project:
 
 ```sh
-moon add cauchyQ/moonbit-roaring@0.2.0
+moon add cauchyQ/moonbit-roaring@0.3.0
 ```
 
 Import `"cauchyQ/moonbit-roaring" @roaring` in your `moon.pkg`.
