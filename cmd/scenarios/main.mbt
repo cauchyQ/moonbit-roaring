@@ -38,4 +38,44 @@ fn main {
   }
   println("checked update version: " + restored.generation().to_string())
   println("incorrect baseline rejected; portable snapshot recovered")
+  // Reproducible sparse index: 10,000 document IDs and a 100-ID update.
+  let mut index = @roaring.UInt32Bitmap::new()
+  for i in 0..<10000 {
+    index = index.add((i * 100003).reinterpret_as_uint())
+  }
+  let original = @roaring.UInt32Snapshot::new("sparse-index", 10UL, index)
+  let mut changed = index
+  for i in 0..<100 {
+    changed = changed.remove((i * 100003).reinterpret_as_uint())
+  }
+  let target = @roaring.UInt32Snapshot::new("sparse-index", 11UL, changed)
+  let delta = original.diff_to(target).unwrap().serialize()
+  let applied = original
+    .apply(@roaring.decode_uint32_patch(delta, "sparse-index").unwrap())
+    .unwrap()
+  if applied.bitmap().xor(changed).cardinality() != 0UL {
+    abort("sparse index delta mismatch")
+  }
+  if applied.apply(@roaring.decode_uint32_patch(delta, "sparse-index").unwrap())
+    is Ok(_) {
+    abort("duplicate delta accepted")
+  }
+  let snapshot = changed.serialize_portable_compact()
+  if @roaring.decode_portable_uint32(snapshot)
+    .unwrap()
+    .xor(changed)
+    .cardinality() !=
+    0UL {
+    abort("sparse snapshot mismatch")
+  }
+  println(
+    "sparse IDs: 10000, removed: 100, remaining: " +
+    changed.cardinality().to_string(),
+  )
+  println(
+    "full bytes: " +
+    snapshot.length().to_string() +
+    ", delta bytes: " +
+    delta.length().to_string(),
+  )
 }

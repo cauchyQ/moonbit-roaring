@@ -40,7 +40,9 @@ moon run cmd/scenarios
 
 The scenarios command checks search intersection, inherited permissions with
 denial, cohort overlap, high-bit IDs, patch baseline rejection and portable
-snapshot recovery. Expected counts are 2, 2 and 2, followed by version 2.
+snapshot recovery. It also generates a reproducible 10,000-ID sparse index,
+removes 100 IDs, checks patch replay and full snapshot recovery. Expected
+counts are 2, 2 and 2, version 2, then 9,900 remaining IDs.
 
 ## Implemented API boundaries
 

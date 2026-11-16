@@ -64,6 +64,11 @@ test "unsigned ranges cross boundaries and include maximum" {
   assert_eq(removed.cardinality(), 3UL)
   assert_true(!removed.contains(2147483648U))
   assert_true(bitmap.add_range(0UL, 4294967297UL) is Err(_))
+  assert_true(bitmap.remove_range(1UL, 0UL) is Err(_))
+  let unchanged = bitmap.add_range(4294967296UL, 4294967296UL).unwrap()
+  assert_eq(unchanged.xor(bitmap).cardinality(), 0UL)
+  let maximum_removed = bitmap.remove_range(4294967295UL, 4294967296UL).unwrap()
+  assert_true(!maximum_removed.contains(4294967295U))
 }
 
 ///|
