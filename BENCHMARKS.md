@@ -50,10 +50,10 @@ intersection. Timings are means of ten batches and include hashing for delta.
 
 | Scenario | Full receive + query | Delta receive + query | Full production | Delta production |
 | --- | ---: | ---: | ---: | ---: |
-| Search | 354.43 µs | 1.61 ms | 250.86 µs | 1.31 ms |
-| Permissions | 296.64 µs | 1.63 ms | 248.72 µs | 1.31 ms |
-| Analytics | 294.97 µs | 1.59 ms | 251.28 µs | 1.27 ms |
+| Search | 359.85 µs | 1.66 ms | 258.36 µs | 1.31 ms |
+| Permissions | 295.29 µs | 1.71 ms | 267.44 µs | 1.31 ms |
+| Analytics | 310.59 µs | 1.59 ms | 246.46 µs | 1.39 ms |
 
-The Run-encoded full snapshot is 29 bytes; the delta is 196 bytes. Full
+The Run-encoded full snapshot is 29 bytes; the delta is 154 bytes. Full
 refresh is smaller and faster for this input. These measurements omit network,
 disk and actual heap-memory costs and are not a comparison with another library.

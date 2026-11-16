@@ -85,8 +85,8 @@ pub fn UInt32Snapshot::apply(
 pub fn UInt32SnapshotPatch::serialize(self : UInt32SnapshotPatch) -> Bytes {
   let name = @buffer.Buffer::Buffer()
   name.write_string_utf8(self.dataset[:])
-  let added = self.additions.serialize_portable().unwrap()
-  let removed = self.removals.serialize_portable().unwrap()
+  let added = self.additions.serialize_portable_compact()
+  let removed = self.removals.serialize_portable_compact()
   let out = @buffer.Buffer::Buffer()
   out.write_bytes(b"URP1"[:])
   out.write_bytes(content_digest(name.to_bytes())[:])

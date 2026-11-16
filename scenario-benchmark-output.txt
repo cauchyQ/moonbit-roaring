@@ -1,15 +1,15 @@
-﻿search full_bytes=29 delta_bytes=196
-permissions full_bytes=29 delta_bytes=196
-analytics full_bytes=29 delta_bytes=196
-search_full_refresh_query 354.43 us +/- 46.84 us
-search_delta_refresh_query 1.61 ms +/- 41.12 us
-search_produce_full 250.86 us +/- 13.00 us
-search_produce_delta_with_hashes 1.31 ms +/- 59.51 us
-permissions_full_refresh_query 296.64 us +/- 8.16 us
-permissions_delta_refresh_query 1.63 ms +/- 70.68 us
-permissions_produce_full 248.72 us +/- 6.74 us
-permissions_produce_delta_with_hashes 1.31 ms +/- 72.48 us
-analytics_full_refresh_query 294.97 us +/- 3.95 us
-analytics_delta_refresh_query 1.59 ms +/- 27.59 us
-analytics_produce_full 251.28 us +/- 13.63 us
-analytics_produce_delta_with_hashes 1.27 ms +/- 19.32 us
+﻿search full_bytes=29 delta_bytes=154
+permissions full_bytes=29 delta_bytes=154
+analytics full_bytes=29 delta_bytes=154
+search_full_refresh_query 359.85 us +/- 45.08 us
+search_delta_refresh_query 1.66 ms +/- 103.81 us
+search_produce_full 258.36 us +/- 11.57 us
+search_produce_delta_with_hashes 1.31 ms +/- 87.43 us
+permissions_full_refresh_query 295.29 us +/- 2.53 us
+permissions_delta_refresh_query 1.71 ms +/- 67.50 us
+permissions_produce_full 267.44 us +/- 27.02 us
+permissions_produce_delta_with_hashes 1.31 ms +/- 50.70 us
+analytics_full_refresh_query 310.59 us +/- 13.73 us
+analytics_delta_refresh_query 1.59 ms +/- 33.84 us
+analytics_produce_full 246.46 us +/- 4.03 us
+analytics_produce_delta_with_hashes 1.39 ms +/- 100.98 us
