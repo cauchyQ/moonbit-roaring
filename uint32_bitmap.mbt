@@ -237,14 +237,22 @@ pub fn UInt32Bitmap::serialize_portable(
     offset += if count <= 4096 { count * 2 } else { 8192 }
   }
   for block in containers {
-    let lows = block.container.values()
-    if lows.length() <= 4096 {
-      for low in lows {
-        buf.write_uint16_le(low.to_uint16())
-      }
-    } else {
-      for word in make_words(lows) {
-        buf.write_int_le(word)
+    match block.container {
+      BitmapContainer(words, count) if count > 4096 =>
+        for word in words {
+          buf.write_int_le(word)
+        }
+      _ => {
+        let lows = block.container.values()
+        if lows.length() <= 4096 {
+          for low in lows {
+            buf.write_uint16_le(low.to_uint16())
+          }
+        } else {
+          for word in make_words(lows) {
+            buf.write_int_le(word)
+          }
+        }
       }
     }
   }
@@ -265,13 +273,12 @@ pub fn UInt32Bitmap::serialize_portable_compact(self : UInt32Bitmap) -> Bytes {
         key: shard * 16384 + block.key,
         container: block.container,
       })
-      let lows = block.container.values()
-      let runs = make_runs(lows)
-      let ordinary_size = if lows.length() <= 4096 {
-        lows.length() * 2
-      } else {
-        8192
+      let runs = match block.container {
+        RunContainer(existing, _) => existing
+        _ => make_runs(block.container.values())
       }
+      let count = block.container.cardinality()
+      let ordinary_size = if count <= 4096 { count * 2 } else { 8192 }
       let use_run = 2 + runs.length() * 4 < ordinary_size
       runs_by_block.push(runs)
       run_flags.push(use_run)
@@ -320,14 +327,22 @@ pub fn UInt32Bitmap::serialize_portable_compact(self : UInt32Bitmap) -> Bytes {
         buf.write_uint16_le((run.end - run.start).to_uint16())
       }
     } else {
-      let lows = blocks[i].container.values()
-      if lows.length() <= 4096 {
-        for low in lows {
-          buf.write_uint16_le(low.to_uint16())
-        }
-      } else {
-        for word in make_words(lows) {
-          buf.write_int_le(word)
+      match blocks[i].container {
+        BitmapContainer(words, count) if count > 4096 =>
+          for word in words {
+            buf.write_int_le(word)
+          }
+        _ => {
+          let lows = blocks[i].container.values()
+          if lows.length() <= 4096 {
+            for low in lows {
+              buf.write_uint16_le(low.to_uint16())
+            }
+          } else {
+            for word in make_words(lows) {
+              buf.write_int_le(word)
+            }
+          }
         }
       }
     }
